@@ -12,9 +12,9 @@ Quickly diagnose network connectivity issues in Splunk distributed environments 
 
 ## Requirements
 
-- Bash shell
+- **Bash shell** (not sh/dash - uses bash-specific `/dev/tcp` feature)
 - Splunk Enterprise installation with configured distributed search
-- Access to `splunk btool` command
+- `splunk` command must be in PATH (or run from `$SPLUNK_HOME/bin`)
 - Network access to peer nodes
 
 ## Usage
@@ -53,9 +53,31 @@ For each discovered peer:
 - **Success** - Port 8089 is reachable
 - **Failed** - Port 8089 is unreachable (network issue, firewall, or peer down)
 
+Summary line shows total succeeded and failed counts.
+
+### Example Output
+
+```
+Testing connectivity to port 8089 on all discovered peers...
+
+Connecting to indexer1.example.com:8089... Success
+Connecting to indexer2.example.com:8089... Failed
+Connecting to indexer3.example.com:8089... Success
+
+Results: 2 succeeded, 1 failed
+```
+
+## Exit Codes
+
+- **0** - All peers reachable
+- **1** - `splunk` command not found
+- **2** - No peers configured
+- **3** - One or more peers unreachable
+
 ## Notes
 
-- Requires Splunk's `btool` utility in PATH
+- Requires `splunk` command in PATH (not just `btool`)
 - Tests management port 8089 only (default Splunk management port)
 - 2-second timeout per peer prevents hanging on unreachable hosts
+- Uses bash-specific `/dev/tcp` feature for connection testing
 - Useful for troubleshooting distributed search connectivity issues
