@@ -1,14 +1,15 @@
 import argparse
 import subprocess
 import re
-import os
+import warnings
 from fnmatch import fnmatch
+from urllib.parse import urlparse
 import xml.etree.ElementTree as ET
 import requests
 import getpass
-from functools import reduce
 
-requests.packages.urllib3.disable_warnings()
+# Suppress only InsecureRequestWarning when verify=False is used
+warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
 class PermissionValue:
     """Stores metadata about a permission's source."""
@@ -23,24 +24,25 @@ class User:
         self.index_conflicts = []  # Conflicting indexes across all roles
         self.capability_conflicts = []  # Conflicting capabilities across all roles
 
-    def get_user_roles(self, splunk_host, session_key, verbose=0):
+    def get_user_roles(self, splunk_host, session_key, verify_ssl=False, verbose=0):
         """Fetch roles assigned to the user via Splunk REST API."""
         url = f"{splunk_host}/services/authentication/users/{self.username}?output_mode=json"
         if verbose >= 3:
             print(f"DEBUG: GET {url} with session_key={session_key[:10]}...")
+        response = None
         try:
-            response = requests.get(url, headers={"Authorization": f"Splunk {session_key}"}, verify=False)
+            response = requests.get(url, headers={"Authorization": f"Splunk {session_key}"}, verify=verify_ssl)
             response.raise_for_status()
             data = response.json()
             return data["entry"][0]["content"]["roles"] if data.get("entry") else []
         except (requests.RequestException, KeyError, IndexError) as e:
-            if verbose >= 3 and isinstance(e, requests.RequestException) and 'response' in locals():
+            if verbose >= 3 and response is not None:
                 print(f"DEBUG: Response content: {response.text}")
             raise Exception(f"Failed to retrieve user roles for {self.username}: {e}")
 
     def _detect_index_conflicts(self, enabled, disabled):
         """Identify index conflicts, including wildcards, using a list comprehension."""
-        return [e for e in enabled for d in disabled if e == d or (d == "*" or fnmatch(e, d))]
+        return [e for e in enabled for d in disabled if e == d or d == "*" or fnmatch(e, d)]
 
     def _detect_capability_conflicts(self, capabilities):
         """Identify capability conflicts between enabled and disabled states."""
@@ -48,15 +50,15 @@ class User:
         disabled = {cap.split("::")[0] for cap in capabilities if "::disabled" in cap}
         return enabled & disabled
 
-    def populate_user(self, splunk_host, username, password, splunk_bin, verbose=0):
+    def populate_user(self, splunk_host, username, password, splunk_bin, verify_ssl=False, verbose=0):
         """Populate user with role data and detect conflicts using btool."""
         if verbose >= 3:
             print(f"DEBUG: Authenticating to {splunk_host} as {username}...")
-        session_key = get_session_key(splunk_host, username, password, verbose)
+        session_key = get_session_key(splunk_host, username, password, verify_ssl, verbose)
         if not session_key:
             raise Exception("Authentication failed: No session key returned.")
 
-        user_roles = self.get_user_roles(splunk_host, session_key, verbose)
+        user_roles = self.get_user_roles(splunk_host, session_key, verify_ssl, verbose)
         if verbose >= 3:
             print(f"DEBUG: Fetched roles for {self.username}: {user_roles}")
 
@@ -91,7 +93,7 @@ class User:
             if verbose >= 3:
                 print(f"DEBUG: Role {role_name} inherited roles: {[r.name for r in role.inherited_roles]}")
 
-            # Detect conflicts with inherited roles using reduce and dict union
+            # Detect conflicts with inherited roles
             for inherited in role.inherited_roles:
                 role.index_conflicts.extend(self._detect_index_conflicts(
                     role.allowed_indexes.keys(), inherited.disallowed_indexes.keys()
@@ -99,7 +101,8 @@ class User:
                 role.index_conflicts.extend(self._detect_index_conflicts(
                     inherited.allowed_indexes.keys(), role.disallowed_indexes.keys()
                 ))
-                all_caps = reduce(lambda x, y: x | y, [role.capabilities.keys(), inherited.capabilities.keys()])
+                # Combine capabilities from both roles using set union
+                all_caps = set(role.capabilities.keys()) | set(inherited.capabilities.keys())
                 role.capability_conflicts += list(self._detect_capability_conflicts(all_caps))
 
             if verbose >= 3:
@@ -246,20 +249,21 @@ class Role(User):
             print(f"Parsed {len(roles)} roles from btool: {', '.join(roles.keys()) or 'None'}")
         return roles.get(self.name)
 
-def get_session_key(splunk_host, username, password, verbose=0):
+def get_session_key(splunk_host, username, password, verify_ssl=False, verbose=0):
     """Authenticate to Splunk REST API and return session key."""
     url = f"{splunk_host}/services/auth/login"
     if verbose >= 3:
         print(f"DEBUG: POST to {url} with username={username}")
+    response = None
     try:
-        response = requests.post(url, data={"username": username, "password": password}, verify=False)
+        response = requests.post(url, data={"username": username, "password": password}, verify=verify_ssl)
         response.raise_for_status()
         session_key = ET.fromstring(response.text).findtext("sessionKey")
         if not session_key:
             raise ValueError("No session key found in response")
         return session_key
     except (requests.RequestException, ET.ParseError) as e:
-        if verbose >= 3 and isinstance(e, requests.RequestException) and 'response' in locals():
+        if verbose >= 3 and response is not None:
             print(f"DEBUG: Response content: {response.text}")
         raise Exception(f"Failed to authenticate: {e}")
 
@@ -268,24 +272,39 @@ def main():
     parser = argparse.ArgumentParser(description="Check Splunk user permissions using btool")
     parser.add_argument("-u", "--url", default="https://localhost:8089",
                         help="Splunk REST API URL (default: https://localhost:8089)")
-    parser.add_argument("-U", "--username", help="Splunk admin username")
-    parser.add_argument("-p", "--password", help="Splunk admin password")
+    parser.add_argument("-U", "--username", help="Splunk admin username (will prompt if not provided)")
+    parser.add_argument("-p", "--password", help="Splunk admin password (will prompt if not provided)")
     parser.add_argument("-t", "--target_user", required=True, help="User to check permissions for")
     parser.add_argument("-b", "--splunk_bin", default="/opt/splunk/bin/splunk",
                         help="Path to splunk binary (default: /opt/splunk/bin/splunk)")
+    parser.add_argument("--verify-ssl", action="store_true", default=False,
+                        help="Verify SSL certificates (default: False for self-signed certs)")
     parser.add_argument("-v", "--verbose", action="count", default=0,
-                        help="Verbosity level (repeat for more detail)")
+                        help="Verbosity level (repeat for more detail: -v, -vv, -vvv)")
     args = parser.parse_args()
 
+    # Validate URL format
     splunk_host = args.url
+    try:
+        parsed = urlparse(splunk_host)
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError("URL must include scheme and host (e.g., https://localhost:8089)")
+        if parsed.scheme not in ('http', 'https'):
+            raise ValueError("URL scheme must be http or https")
+    except Exception as e:
+        parser.error(f"Invalid URL: {e}")
+
     username = args.username if args.username is not None else input("Enter Splunk username: ")
     password = args.password if args.password is not None else getpass.getpass("Enter Splunk password: ")
 
     if args.verbose >= 3:
-        print(f"DEBUG: splunk_host={splunk_host}, username={username}, target_user={args.target_user}")
+        print(f"DEBUG: splunk_host={splunk_host}, username={username}, target_user={args.target_user}, verify_ssl={args.verify_ssl}")
+
+    if not args.verify_ssl and args.verbose >= 1:
+        print("WARNING: SSL certificate verification is disabled. Use --verify-ssl to enable.")
 
     user = User(args.target_user)
-    user.populate_user(splunk_host, username, password, args.splunk_bin, args.verbose)
+    user.populate_user(splunk_host, username, password, args.splunk_bin, args.verify_ssl, args.verbose)
     user.print_results(args.verbose)
 
 if __name__ == "__main__":
