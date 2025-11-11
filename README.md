@@ -45,6 +45,7 @@ Solution: PowerShell script to generate custom-sized event log entries
 ## General Requirements
 
 Most scripts require one or more of:
+
 - Splunk Enterprise installation
 - Splunk's Python interpreter (`$SPLUNK_HOME/bin/python`)
 - Bash shell (Linux/macOS)
@@ -59,3 +60,4 @@ Each tool has its own README with detailed usage instructions, parameters, and t
 ## Authors
 
 - Tyler Ezell - Initial work and maintenance
+- Rob Hilgefort - Repository setup, review, and stewardship
