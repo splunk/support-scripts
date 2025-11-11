@@ -1,4 +1,32 @@
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# IDEs
 .vscode
 .idea
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
 .pytest_cache
+venv/
+env/
+
+# Generated files
+splunk_lookup.csv
+*.log
+*.csv
+
+# Temporary files
+*.tmp
+*.bak
+.*.swp
