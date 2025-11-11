@@ -1,0 +1,46 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["rules"],
+    "properties": {
+        "rules": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["filename", "stanza", "setting", "expected_value"],
+                "properties": {
+                    "filename": {
+                        "type": "string",
+                        "description": "The Splunk configuration file name without .conf extension"
+                    },
+                    "stanza": {
+                        "type": "string",
+                        "description": "The configuration stanza name"
+                    },
+                    "setting": {
+                        "type": "string",
+                        "description": "The configuration setting key"
+                    },
+                    "expected_value": {
+                        "description": "The expected value for the setting",
+                        "oneOf": [
+                            { "type": "string" },
+                            { "type": "boolean" },
+                            { "type": "number" }
+                        ]
+                    },
+                    "level": {
+                        "type": "string",
+                        "enum": ["INFO", "WARN", "ERROR"],
+                        "default": "WARN",
+                        "description": "The severity level if the check fails"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Optional custom message to display when the check fails"
+                    }
+                }
+            }
+        }
+    }
+}

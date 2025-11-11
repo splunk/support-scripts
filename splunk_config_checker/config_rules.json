@@ -1,0 +1,36 @@
+{
+    "rules": [
+        {
+            "filename": "outputs",
+            "stanza": "tcpout",
+            "setting": "compressed",
+            "expected_value": true,
+            "level": "WARN",
+            "message": "Data compression should be enabled for tcpout to optimize network usage"
+        },
+        {
+            "filename": "outputs",
+            "stanza": "tcpout",
+            "setting": "useClientSSLCompression",
+            "expected_value": true,
+            "level": "WARN",
+            "message": "SSL compression should be enabled for tcpout to optimize encrypted traffic"
+        },
+        {
+            "filename": "server",
+            "stanza": "sslConfig",
+            "setting": "allowSslCompression",
+            "expected_value": true,
+            "level": "WARN",
+            "message": "SSL compression should be enabled in server.conf for optimal performance"
+        },
+        {
+            "filename": "server",
+            "stanza": "kvstore",
+            "setting": "allowSslCompression",
+            "expected_value": true,
+            "level": "WARN",
+            "message": "SSL compression should be enabled for KV Store for optimal performance"
+        }
+    ]
+}
