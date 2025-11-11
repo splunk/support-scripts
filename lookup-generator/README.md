@@ -13,8 +13,11 @@ Quickly create sizeable lookup files with sample data to:
 ## Requirements
 
 - Bash shell
-- Standard Unix tools (tr, stat, shuf)
+- Standard Unix tools (tr, awk, df)
 - `/dev/urandom` for random data generation
+- At least 24MB free disk space (14MB target + buffer)
+
+**Compatible with:** Linux and macOS/BSD
 
 ## Usage
 
@@ -58,6 +61,8 @@ Zx7Mn4Qw,Kf6Gh8JcPl,Kf6Gh8JcPl@example.com,32,Germany
 
 ## Notes
 
-- File size may vary slightly based on random data
-- Script runs until target size reached
+- File size may vary slightly (±1MB) due to row boundaries - script stops when target size is reached
+- Script checks available disk space before generating
+- Includes safety limit to prevent infinite loops
+- Cross-platform compatible (auto-detects OS for correct stat command)
 - Useful for testing lookup limits and performance in Splunk
