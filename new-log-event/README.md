@@ -13,8 +13,8 @@ Create Windows event log entries of specific sizes to:
 ## Requirements
 
 - Windows operating system
-- PowerShell 5.1 or higher
-- Administrator privileges (required to create event sources)
+- PowerShell 3.0 or higher
+- **Administrator privileges required** (script checks and exits if not running as admin)
 
 ## Usage
 
@@ -56,8 +56,10 @@ Event written to Application with size 8000 characters
 
 ## Notes
 
-- First run may require admin privileges to create event source
-- Event source creation is one-time per source name
+- **Always requires Administrator privileges** - script validates elevation before running
+- Creating new event sources requires admin rights (one-time per source name)
 - Events appear in Windows Event Viewer under specified log
+- Script uses Event ID 1001 for all generated events
 - Useful for testing Splunk's Windows event input configuration
 - Maximum event size: 32000 characters (Windows limitation)
+- Uses `throw` for proper PowerShell error handling (catchable by calling code)
