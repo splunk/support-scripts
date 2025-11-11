@@ -6,90 +6,41 @@ A curated collection of diagnostic and administrative tools for Splunk environme
 
 ### Configuration & Security
 
-#### KV Store Certificate Verifier
+**[KV Store Certificate Verifier](kvcertverify/README.md)**
+Problem: Need to verify KV Store certificates before upgrading MongoDB from 4/4.2 to 7
+Solution: Validates SSL settings, certificate chains, and compatibility requirements
 
-Validates KV Store certificate configurations before upgrading from MongoDB 4/4.2 to 7. Checks SSL settings, certificate chains, and compatibility requirements.
-
-```bash
-cd kvcertverify
-$SPLUNK_HOME/bin/python kv_cert_verifier.py $SPLUNK_HOME
-```
-
-[Full documentation](kvcertverify/README.md)
-
-#### Splunk Config Checker
-
-Generic configuration validator using JSON-based rules. Checks settings across multiple conf files with custom severity levels and detailed reporting.
-
-```bash
-cd splunk_config_checker
-$SPLUNK_HOME/bin/python splunk_config_checker.py $SPLUNK_HOME
-```
-
-[Full documentation](splunk_config_checker/README.md)
+**[Splunk Config Checker](splunk_config_checker/README.md)**
+Problem: Need to validate Splunk configurations across multiple conf files
+Solution: Generic validator using JSON-based rules with custom severity levels and detailed reporting
 
 ### User & Permission Management
 
-#### Splunk User Permissions Checker
-
-Audits user permissions by querying REST API. Shows role assignments, capabilities, index access, and detects permission conflicts.
-
-```bash
-cd splunk-user-permissions
-$SPLUNK_HOME/bin/python splk_user_perms.py --user <username>
-```
-
-[Full documentation](splunk-user-permissions/README.md)
+**[Splunk User Permissions Checker](splunk-user-permissions/README.md)**
+Problem: Need to audit user permissions and identify conflicts
+Solution: Queries REST API to show role assignments, capabilities, index access, and permission conflicts
 
 ### Input & Data Management
 
-#### Find Duplicate Inputs
+**[Find Duplicate Inputs](find-duplicate-inputs/README.md)**
+Problem: Duplicate data ingestion from overlapping monitor inputs
+Solution: Scans inputs.conf files to identify duplicate or overlapping monitor paths
 
-Scans configuration files to identify duplicate or overlapping monitor inputs that could cause data duplication.
-
-```bash
-cd find-duplicate-inputs
-./find_duplicate_inputs.sh
-```
-
-[Full documentation](find-duplicate-inputs/README.md)
-
-#### Lookup Generator
-
-Creates large test CSV lookup files with randomized data for performance testing and development.
-
-```bash
-cd lookup-generator
-./lookup_gen.sh
-```
-
-[Full documentation](lookup-generator/README.md)
+**[Lookup Generator](lookup-generator/README.md)**
+Problem: Need large test lookup files for performance testing
+Solution: Generates CSV files with randomized data up to specified size (default 14MB)
 
 ### Cluster & Network Diagnostics
 
-#### Test Peers
-
-Tests TCP connectivity to all distributed search peers on port 8089. Auto-discovers peers from configuration.
-
-```bash
-cd test-peers
-./testpeers.sh
-```
-
-[Full documentation](test-peers/README.md)
+**[Test Peers](test-peers/README.md)**
+Problem: Need to verify distributed search peer connectivity
+Solution: Auto-discovers peers and tests TCP connectivity on port 8089
 
 ### Testing & Validation
 
-#### New Log Event (Windows)
-
-PowerShell script to generate custom-sized Windows Event Log entries for testing ingestion pipelines.
-
-```powershell
-cd new-log-event
-.\New-LogEvent.ps1 -Size 8000 -Path Application
-```
-
-[Full documentation](new-log-event/README.md)
+**[New Log Event](new-log-event/README.md)** (Windows)
+Problem: Need to test Windows event log ingestion with specific event sizes
+Solution: PowerShell script to generate custom-sized event log entries
 
 ## General Requirements
 
