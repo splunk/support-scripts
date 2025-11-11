@@ -33,17 +33,32 @@ cd $SPLUNK_HOME/etc/apps/my_app
 /path/to/find_duplicate_inputs.sh
 ```
 
+## How It Works
+
+The script normalizes paths to detect potential duplicates:
+1. Converts Windows backslashes to forward slashes
+2. Removes file pattern suffixes (e.g., `*.log`, `file.*`)
+3. Compares normalized paths (case-sensitive)
+
+This groups paths like `/var/log/*.log` and `/var/log/app.log` as potential duplicates since they may overlap.
+
 ## Output
 
-The script prints all duplicate monitor stanza configurations found. If duplicates exist, it displays:
-- File path containing the duplicate
-- The monitor path that's duplicated
-- All locations where the duplicate appears
+Prints all monitor stanzas that have matching normalized paths. Each line shows:
+- Configuration file path
+- The monitor stanza found
 
-No output means no duplicates were detected.
+### Example Output
+
+```
+./etc/apps/app1/local/inputs.conf:[monitor:///var/log]
+./etc/apps/app2/default/inputs.conf:[monitor:///var/log/*.log]
+```
+
+No output means no potential duplicates detected.
 
 ## Notes
 
-- Script normalizes paths (handles case differences and wildcards)
-- Checks for overlapping directory monitors that could cause duplication
-- Useful for troubleshooting duplicate data issues or config audits
+- Path matching is **case-sensitive** (as Unix filesystems are)
+- Groups directory monitors with file pattern monitors that could overlap
+- Useful for troubleshooting duplicate data ingestion or config audits
