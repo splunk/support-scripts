@@ -42,6 +42,13 @@ A curated collection of diagnostic and administrative tools for Splunk environme
 - **Problem**: Need to verify distributed search peer connectivity
 - **Solution**: Auto-discovers peers and tests TCP connectivity on port 8089
 
+### Performance & Diagnostics
+
+**[Kernel Stacks Splunk Threads](kernel-stacks-splunk-threads/README.md)** - Monitor Splunk threads and collect kernel stacks (Linux only)
+
+- **Problem**: Need to diagnose Splunk thread exhaustion and capture system state during incidents
+- **Solution**: Monitors splunkd thread count and automatically collects kernel stack traces when threshold exceeded
+
 ### Testing & Validation
 
 **[New Log Event](new-log-event/README.md)** - Generate Windows event log entries (Windows only)
@@ -146,5 +153,5 @@ Send scripts to the repository maintainer for review. Include:
 
 ## Authors
 
-- Tyler Ezell - Initial work and maintenance
-- Rob Hilgefort - Repository setup, review, and stewardship
+- Tyler Ezell - Initial scripts and maintenance.
+- Rob Hilgefort - Repository setup, review, and stewardship.
