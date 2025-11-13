@@ -13,24 +13,29 @@ This tool verifies KV Store certificate configurations for safe upgrades from Sp
 ## Requirements Verified
 
 ### Certificate Format Requirements
+
 - **Certificate structure**: Must contain public key, private key, and CA public key
 - **Chain validation**: Server certificates must verify against specified CA
 
 ### Certificate Purpose Requirements
+
 - **sslConfig certificates**: Must be signed by given/presented CA
 - **kvstore certificates**: Must have no purpose OR be dual purpose (client + server)
 - **CA certificates**: Must have no purpose OR be dual purpose (client + server)
 
 ### Network Requirements
+
 - **SAN validation**: KV Store certificates must contain 127.0.0.1 or localhost, unless `verifyServerName=false`
 - **Hostname validation**: Can be disabled via `verifyServerName=false` setting
 
 ### Configuration Requirements
+
 - **SSL Compression**: `allowSslCompression=true` required in `[sslConfig]`
 - **SSL Renegotiation**: `allowSslRenegotiation=true` required in `[sslConfig]`
 - **CA Completeness**: `sslRootCAPath` must contain ALL CAs used in KV Store cluster
 
 ### Version-Specific Requirements
+
 - **Splunk 9.4.3+**: Custom KV Store certificates supported
 - **Earlier versions**: Must use default certificates
 
@@ -39,12 +44,14 @@ This tool verifies KV Store certificate configurations for safe upgrades from Sp
 ### Prerequisites
 
 **For Python script (recommended):**
+
 ```bash
 # Python 3.6+ required
 pip install -r requirements.txt
 ```
 
 **For basic bash script:**
+
 ```bash
 # Only requires standard Unix tools
 # OpenSSL recommended for certificate analysis
@@ -53,6 +60,7 @@ pip install -r requirements.txt
 ### Dependencies
 
 The Python script requires:
+
 - `splunk_config_checker` - Internal package for configuration validation
 - `cryptography` - For certificate parsing and validation
 - `configparser` - For parsing Splunk configuration files
@@ -94,9 +102,10 @@ python3 kv_cert_verifier.py $SPLUNK_HOME -v
 ## Output
 
 ### Success Example
+
 ```
 ✓ SSL Config section exists
-✓ SSL compression enabled  
+✓ SSL compression enabled
 ✓ SSL renegotiation enabled
 ✓ SSL server certificate valid
 ✓ SSL certificate chain valid
@@ -114,9 +123,10 @@ Checks passed: 12/12
 ```
 
 ### Error Example
+
 ```
 ✗ SSL Config section exists
-✓ SSL compression enabled  
+✓ SSL compression enabled
 ✗ SSL renegotiation enabled
 ✗ SSL server certificate valid
 ✗ SSL certificate chain valid
@@ -151,12 +161,14 @@ The tool examines the following Splunk configuration files:
 ### Key Sections Analyzed
 
 #### [sslConfig] Section
+
 - `allowSslCompression` - Must be `true`
-- `allowSslRenegotiation` - Must be `true`  
+- `allowSslRenegotiation` - Must be `true`
 - `serverCert` - Server certificate path
 - `caCertFile` or `sslRootCAPath` - CA certificate path
 
-#### [kvstore] Section  
+#### [kvstore] Section
+
 - `serverCert` - KV Store server certificate
 - `caCertFile` or `sslRootCAPath` - KV Store CA certificate
 - `verifyServerName` - Hostname verification setting
@@ -164,17 +176,20 @@ The tool examines the following Splunk configuration files:
 ## Certificate Analysis
 
 ### Format Validation
+
 - **PEM Format**: Checks for proper BEGIN/END markers
 - **PKCS8**: Validates private key format for sslConfig
 - **PKCS12**: Supports PKCS12 format (Windows environments)
 - **Certificate Count**: Verifies CA files contain expected certificates
 
 ### Purpose Validation
+
 - **Key Usage**: Analyzes X.509 Key Usage extension
 - **Extended Key Usage**: Checks for Server Auth and Client Auth purposes
 - **No Purpose**: Validates certificates without purpose restrictions
 
 ### Chain Validation
+
 - **Signature Verification**: Confirms certificates signed by specified CA
 - **Issuer Matching**: Validates certificate issuer against CA subject
 - **Trust Chain**: Ensures complete certificate chain validation
@@ -184,28 +199,37 @@ The tool examines the following Splunk configuration files:
 ### Common Issues
 
 **1. Certificate Not Found**
+
 ```
 ERROR: Server certificate file not found: /path/to/cert.pem
 ```
-*Solution*: Verify certificate path in server.conf and file permissions
+
+_Solution_: Verify certificate path in server.conf and file permissions
 
 **2. Certificate Purpose Mismatch**
+
 ```
 ERROR: KV Store server certificate must have no purpose or be dual purpose
 ```
-*Solution*: Generate certificates without Extended Key Usage or with both Server Auth and Client Auth
+
+_Solution_: Generate certificates without Extended Key Usage or with both Server Auth and Client Auth
 
 **3. SAN Missing Localhost**
+
 ```
 ERROR: KV Store server certificate SAN must contain 127.0.0.1 or localhost
 ```
-*Solution*: Add localhost/127.0.0.1 to SAN or set `verifyServerName=false`
+
+_Solution_: Add localhost/127.0.0.1 to SAN or set `verifyServerName=false`
 
 **4. SSL Settings Missing**
+
 ```
 ERROR: allowSslCompression must be set to true in [sslConfig]
 ```
-*Solution*: Add required SSL settings to server.conf:
+
+_Solution_: Add required SSL settings to server.conf:
+
 ```ini
 [sslConfig]
 allowSslCompression = true
@@ -215,10 +239,12 @@ allowSslRenegotiation = true
 ### Version-Specific Issues
 
 **Splunk < 9.4.3**: Custom certificates may not be supported
+
 - Use default Splunk certificates
 - Verify default certificate locations
 
 **Splunk >= 9.4.3**: Custom certificates supported
+
 - Follow certificate format requirements
 - Ensure proper certificate purposes
 
@@ -232,7 +258,7 @@ allowSslRenegotiation = true
 To extend the tool:
 
 1. **Add new checks**: Extend the verification methods in `CertificateVerifier` class
-2. **Improve certificate analysis**: Enhance certificate parsing in `load_certificate()` method  
+2. **Improve certificate analysis**: Enhance certificate parsing in `load_certificate()` method
 3. **Add configuration support**: Extend `parse_server_conf()` for additional settings
 4. **Version handling**: Update `check_version_compatibility()` for new Splunk versions
 

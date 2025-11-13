@@ -5,6 +5,7 @@ Checks and analyzes Splunk user permissions by querying the Splunk REST API. Ide
 ## Purpose
 
 Helps administrators audit user permissions in Splunk environments by:
+
 - Displaying all roles assigned to a user
 - Listing capabilities (enabled and disabled)
 - Showing index permissions (allowed and restricted)
@@ -58,6 +59,7 @@ $SPLUNK_HOME/bin/python splk_user_perms.py -t analyst --verify-ssl -vv
 ## Output
 
 The tool displays:
+
 - User's assigned roles
 - Capabilities per role (including inheritance)
 - Index permissions per role

@@ -36,6 +36,7 @@ cd $SPLUNK_HOME/etc/apps/my_app
 ## How It Works
 
 The script normalizes paths to detect potential duplicates:
+
 1. Converts Windows backslashes to forward slashes
 2. Removes file pattern suffixes (e.g., `*.log`, `file.*`)
 3. Compares normalized paths (case-sensitive)
@@ -45,6 +46,7 @@ This groups paths like `/var/log/*.log` and `/var/log/app.log` as potential dupl
 ## Output
 
 Prints all monitor stanzas that have matching normalized paths. Each line shows:
+
 - Configuration file path
 - The monitor stanza found
 

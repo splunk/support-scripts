@@ -5,6 +5,7 @@ Tests network connectivity to all Splunk cluster peers on port 8089. Automatical
 ## Purpose
 
 Quickly diagnose network connectivity issues in Splunk distributed environments by:
+
 - Auto-discovering all configured search peers
 - Testing TCP connectivity on management port (8089)
 - Identifying unreachable or misconfigured peers
@@ -50,6 +51,7 @@ cd /path/to/test-peers
 ## Output
 
 For each discovered peer:
+
 - **Success** - Port 8089 is reachable
 - **Failed** - Port 8089 is unreachable (network issue, firewall, or peer down)
 

@@ -5,6 +5,7 @@ Generates large test CSV lookup files for Splunk testing and validation. Creates
 ## Purpose
 
 Quickly create sizeable lookup files with sample data to:
+
 - Test lookup performance in Splunk
 - Validate data ingestion pipelines
 - Develop and test dashboards with realistic data volumes
@@ -39,12 +40,14 @@ By default, generates `splunk_lookup.csv` with approximately 14MB of data in the
 ### Modifying Output
 
 Edit the script to customize:
+
 - `OUTPUT_FILE` - Change output filename (default: `splunk_lookup.csv`)
 - `TARGET_SIZE_MB` - Change target file size (default: 14MB)
 
 ## Output Format
 
 CSV file with columns:
+
 - `id` - Random 8-character identifier
 - `username` - Random 10-character username
 - `email` - Generated email address

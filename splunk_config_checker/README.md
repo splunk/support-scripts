@@ -20,16 +20,16 @@ The Splunk Configuration Checker is a flexible tool that allows you to:
 
 ```json
 {
-    "rules": [
-        {
-            "filename": "outputs",
-            "stanza": "tcpout",
-            "setting": "compressed",
-            "expected_value": true,
-            "level": "WARN",
-            "message": "Data compression should be enabled for tcpout"
-        }
-    ]
+  "rules": [
+    {
+      "filename": "outputs",
+      "stanza": "tcpout",
+      "setting": "compressed",
+      "expected_value": true,
+      "level": "WARN",
+      "message": "Data compression should be enabled for tcpout"
+    }
+  ]
 }
 ```
 
@@ -62,23 +62,23 @@ Each rule in the JSON file must include:
 
 ```json
 {
-    "rules": [
-        {
-            "filename": "outputs",
-            "stanza": "tcpout",
-            "setting": "compressed",
-            "expected_value": true,
-            "level": "WARN",
-            "message": "Data compression should be enabled for tcpout"
-        },
-        {
-            "filename": "server",
-            "stanza": "sslConfig",
-            "setting": "allowSslCompression",
-            "expected_value": true,
-            "level": "WARN"
-        }
-    ]
+  "rules": [
+    {
+      "filename": "outputs",
+      "stanza": "tcpout",
+      "setting": "compressed",
+      "expected_value": true,
+      "level": "WARN",
+      "message": "Data compression should be enabled for tcpout"
+    },
+    {
+      "filename": "server",
+      "stanza": "sslConfig",
+      "setting": "allowSslCompression",
+      "expected_value": true,
+      "level": "WARN"
+    }
+  ]
 }
 ```
 
