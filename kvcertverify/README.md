@@ -153,10 +153,13 @@ kvcertverify/
 
 ## Configuration Files Checked
 
-The tool examines the following Splunk configuration files:
+The tool uses `splunk btool server list` to retrieve the effective `server.conf` configuration from all layers (default, local, and app contexts). This ensures all configuration sources are properly evaluated, including:
 
-1. **`$SPLUNK_HOME/etc/system/default/server.conf`** - Default settings
-2. **`$SPLUNK_HOME/etc/system/local/server.conf`** - Local overrides
+- `$SPLUNK_HOME/etc/system/default/server.conf`
+- `$SPLUNK_HOME/etc/system/local/server.conf`
+- `$SPLUNK_HOME/etc/apps/*/local/server.conf`
+
+If `btool` is unavailable, falls back to manual parsing of default and local files only.
 
 ### Key Sections Analyzed
 

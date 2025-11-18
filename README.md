@@ -142,6 +142,8 @@ Explain the problem this tool solves and use cases.
 - Cross-platform compatibility when possible (test on Linux/macOS)
 - Clear comments for complex logic
 - Security best practices (avoid hardcoded credentials, validate inputs)
+- Scripts cannot change customer environment apart from creating logging files
+- When using python, if at all possible, use the python packaged with Splunk for consistencies sake
 
 ### Submitting Scripts
 
