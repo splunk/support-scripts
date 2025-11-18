@@ -2,6 +2,26 @@
 
 A curated collection of diagnostic and administrative tools for Splunk environments, maintained by Splunk Support for customer use. These scripts help troubleshoot common issues, validate configurations, and perform routine maintenance tasks.
 
+## Table of Contents
+
+- [Splunk Support Scripts](#splunk-support-scripts)
+  - [Table of Contents](#table-of-contents)
+  - [Available Tools](#available-tools)
+    - [Configuration \& Security](#configuration--security)
+    - [User \& Permission Management](#user--permission-management)
+    - [Input \& Data Management](#input--data-management)
+    - [Cluster \& Network Diagnostics](#cluster--network-diagnostics)
+    - [Performance \& Diagnostics](#performance--diagnostics)
+    - [Testing \& Validation](#testing--validation)
+  - [General Requirements](#general-requirements)
+  - [Getting Help](#getting-help)
+  - [Contributing](#contributing)
+    - [Adding a New Script](#adding-a-new-script)
+    - [README Template](#readme-template)
+    - [Code Quality Expectations](#code-quality-expectations)
+    - [Submitting Scripts](#submitting-scripts)
+  - [Authors](#authors)
+
 ## Available Tools
 
 ### Configuration & Security
