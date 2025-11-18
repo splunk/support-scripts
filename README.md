@@ -21,6 +21,9 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Code Quality Expectations](#code-quality-expectations)
     - [Submitting Scripts](#submitting-scripts)
   - [Authors](#authors)
+  - [Changelog](#changelog)
+    - [v1.1.0 - 2025-11-18](#v110---2025-11-18)
+    - [v1.0.0 - Initial Release](#v100---initial-release)
 
 ## Available Tools
 
@@ -64,10 +67,30 @@ A curated collection of diagnostic and administrative tools for Splunk environme
 
 ### Performance & Diagnostics
 
+**[Debugging Splunk - Stack Collection Tool](debugging-splunk/README.md)** - Advanced pstack collection for main splunkd (Linux only)
+
+- **Problem**: Need detailed user-space stack traces from splunkd for debugging lock contention, deadlocks, and thread issues
+- **Solution**: Advanced collection tool with multiple modes (batch, continuous, Docker), sophisticated sampling, and optional process freezing
+
+**[Kernel Stacks - D-State Monitor](kernel-stacks/README.md)** - Monitor D-state processes and collect kernel stacks (Linux only)
+
+- **Problem**: Need to diagnose processes stuck in uninterruptible sleep (D-state) waiting for I/O or resources
+- **Solution**: Continuously monitors and captures kernel stacks specifically for D-state processes to identify I/O bottlenecks
+
 **[Kernel Stacks Splunk Threads](kernel-stacks-splunk-threads/README.md)** - Monitor Splunk threads and collect kernel stacks (Linux only)
 
 - **Problem**: Need to diagnose Splunk thread exhaustion and capture system state during incidents
 - **Solution**: Monitors splunkd thread count and automatically collects kernel stack traces when threshold exceeded
+
+**[Splunkd Pstacks Threads Monitor](splunkd-pstacks-threads/README.md)** - Monitor main splunkd threads and collect pstacks (Linux only)
+
+- **Problem**: Need to automatically capture user-space stack traces when splunkd thread count exceeds 500
+- **Solution**: Monitors main splunkd process and collects pstack dumps to diagnose lock contention and thread exhaustion
+
+**[Process-Runner Pstacks Threads Monitor](process-runner-pstacks-threads/README.md)** - Monitor process-runner threads and collect pstacks (Linux only)
+
+- **Problem**: Need to diagnose thread issues specific to Splunk process-runner (scripted inputs, custom commands)
+- **Solution**: Monitors process-runner thread count and collects pstack dumps to identify issues with external process execution
 
 ### Testing & Validation
 
@@ -175,5 +198,30 @@ Send scripts to the repository maintainer for review. Include:
 
 ## Authors
 
-- Tyler Ezell - Initial scripts and maintenance.
-- Rob Hilgefort - Repository setup, review, and stewardship.
+- Tyler Ezell (tezell@splunk.com) - Initial scripts and maintenance
+- Rob Hilgefort (rhilgefort@splunk.com) - Repository setup, review, and stewardship
+- Robert Phillips (rphillips@splunk.com) - Performance diagnostics and stack collection tools
+
+## Changelog
+
+### v1.1.0 - 2025-11-18
+
+**Added:**
+
+- `debugging-splunk` - Advanced pstack collection tool for main splunkd with multiple collection modes
+- `kernel-stacks` - D-state process monitor for diagnosing uninterruptible sleep issues
+- `splunkd-pstacks-threads` - Automatic pstack collection when main splunkd thread count exceeds 500
+- `process-runner-pstacks-threads` - Automatic pstack collection when process-runner thread count exceeds 500
+
+### v1.0.0 - Initial Release
+
+**Included:**
+
+- `kvcertverify` - KV Store certificate verifier for MongoDB upgrades
+- `splunk_config_checker` - Generic configuration validator
+- `splunk-user-permissions` - User permissions and conflicts auditor
+- `find-duplicate-inputs` - Duplicate monitor input detector
+- `lookup-generator` - Large test lookup file generator
+- `test-peers` - Distributed search peer connectivity tester
+- `kernel-stacks-splunk-threads` - Kernel stack collector triggered by Splunk thread threshold
+- `new-log-event` - Windows event log entry generator
