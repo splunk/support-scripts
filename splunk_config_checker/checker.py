@@ -86,7 +86,7 @@ class SplunkConfigChecker:
                 'btool',
                 conf_name,
                 'list',
-                '--no-default',
+                #'--no-default',
                 '--debug'
             ]
             

@@ -24,6 +24,17 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
+class Colors:
+    """ANSI color codes for terminal output"""
+
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    CYAN = "\033[96m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+
 class CheckLevel(Enum):
     """Severity levels for configuration checks"""
     INFO = "INFO"
@@ -86,8 +97,8 @@ class SplunkConfigChecker:
                 'btool',
                 conf_name,
                 'list',
-                '--no-default',
-                '--debug'
+                #'--no-default',
+                #'--debug'
             ]
             
             btool_output = subprocess.check_output(btool_cmd, text=True)
@@ -117,19 +128,43 @@ class SplunkConfigChecker:
 
     def _parse_conf_manual(self, conf_name: str) -> Dict:
         """Manual fallback parsing of configuration files"""
-        conf_path_local = self.splunk_home / "etc" / "system" / "local" / f"{conf_name}.conf"
-        conf_path_default = self.splunk_home / "etc" / "system" / "default" / f"{conf_name}.conf"
-        
         config = configparser.ConfigParser(allow_no_value=True)
         config.optionxform = str  # Preserve case
         
-        # Read default first, then local (local overrides default)
-        for conf_path in [conf_path_default, conf_path_local]:
-            if conf_path.exists():
-                try:
-                    config.read(conf_path)
-                except Exception as e:
-                    print(f"Error reading {conf_path}: {e}", file=sys.stderr)
+        # List of paths to check (in precedence order: system/default, then system/local, then apps)
+        conf_paths = []
+        files_read = []
+
+        # System default
+        system_default = self.splunk_home / "etc" / "system" / "default" / f"{conf_name}.conf"
+        if system_default.exists():
+            conf_paths.append(system_default)
+
+        # System local
+        system_local = self.splunk_home / "etc" / "system" / "local" / f"{conf_name}.conf"
+        if system_local.exists():
+            conf_paths.append(system_local)
+
+        # Apps directories (check common app locations)
+        apps_dir = self.splunk_home / "etc" / "apps"
+        if apps_dir.exists():
+            for app_dir in apps_dir.iterdir():
+                if app_dir.is_dir():
+                    for subdir in ["default", "local"]:
+                        app_conf = app_dir / subdir / f"{conf_name}.conf"
+                        if app_conf.exists():
+                            conf_paths.append(app_conf)
+
+        # Read all configuration files (later files override earlier ones)
+        for conf_path in conf_paths:
+            try:
+                config.read(conf_path)
+                files_read.append(str(conf_path))
+            except Exception as e:
+                print(f"Error reading {conf_path}: {e}", file=sys.stderr)
+
+        if not files_read:
+            print(f"No {conf_name}.conf files found in {self.splunk_home}/etc/", file=sys.stderr)
                     
         result = {}
         for section in config.sections():
@@ -163,10 +198,22 @@ class SplunkConfigChecker:
             passed = False
             if actual_value is not None:
                 if isinstance(rule.expected_value, bool):
-                    passed = str(actual_value).lower() == str(rule.expected_value).lower()
+                    # Boolean comparison
+                    actual_bool = str(actual_value).lower() in ('true', '1', 'yes', 'on')
+                    passed = actual_bool == rule.expected_value
+                elif isinstance(rule.expected_value, int):
+                    # Integer comparison
+                    try:
+                        passed = int(actual_value) == rule.expected_value
+                    except (ValueError, TypeError):
+                        passed = False
                 else:
-                    passed = str(actual_value) == str(rule.expected_value)
+                    # String comparison
+                    passed = str(actual_value).strip() == str(rule.expected_value).strip()
                     
+            # Generate message
+            #print(f"Debug: Checking {rule.filename}.conf [{rule.stanza}] {rule.setting}: expected='{rule.expected_value}' ({type(rule.expected_value).__name__}), actual='{actual_value}' ({type(actual_value).__name__ if actual_value is not None else 'None'}), passed={passed}", file=sys.stderr)
+
             # Generate message
             if not passed:
                 message = rule.message or (
@@ -194,6 +241,16 @@ class SplunkConfigChecker:
         for result in results:
             level_str = result.rule.level.value
             if result.passed:
-                print(f"[PASS] {result.message}")
+                print(f"{Colors.GREEN}[INFO] {result.message}{Colors.ENDC}")
+
             else:
-                print(f"[{level_str}] {result.message}")
+                print(f"{Colors.RED}[{level_str}] {result.message}{Colors.ENDC}")
+
+if __name__ == "__main__":
+
+    splunk_home = Path("/opt/splunk")
+    rules_file = Path("config_rules.json")
+
+    checker = SplunkConfigChecker(splunk_home, rules_file)
+    results = checker.check_configurations()
+    checker.print_results(results)

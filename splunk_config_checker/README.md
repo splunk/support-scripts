@@ -47,6 +47,10 @@ results = checker.check_configurations()
 checker.print_results(results)
 ```
 
+3. Use the checker natively.
+
+```python splunk_config_checker.py
+
 ### Rule Format
 
 Each rule in the JSON file must include:

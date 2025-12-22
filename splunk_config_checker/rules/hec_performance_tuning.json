@@ -1,0 +1,84 @@
+{
+    "rules": [
+        {
+            "filename": "inputs",
+            "stanza": "http",
+            "setting": "dedicatedIoThreads",
+            "expected_value": 8,
+            "level": "WARN",
+            "message": "inputs.conf [http] dedicatedIoThreads should be set to at least 8"
+        },
+        {
+            "filename": "inputs",
+            "stanza": "http",
+            "setting": "busyKeepAliveIdleTimeout",
+            "expected_value": 300,
+            "level": "WARN",
+            "message": "inputs.conf [http] busyKeepAliveIdleTimeout should be set to at least 300"
+        },
+        {
+            "filename": "inputs",
+            "stanza": "http",
+            "setting": "sslServerHandshakeTimeout",
+            "expected_value": 300,
+            "level": "WARN",
+            "message": "inputs.conf [http] sslServerHandshakeTimeout should be set to at least 300"
+        },
+        {
+            "filename": "server",
+            "stanza": "general",
+            "setting": "parallelIngestionPipelines",
+            "expected_value": 2,
+            "level": "WARN",
+            "message": "server.conf [general] parallelIngestionPipelines should be set to 2"
+        },
+        {
+            "filename": "server",
+            "stanza": "queue=indexQueue",
+            "setting": "maxSize",
+            "expected_value": "100MB",
+            "level": "WARN",
+            "message": "server.conf [queue=indexQueue] maxSize should be set to at least 100MB"
+        },
+        {
+            "filename": "server",
+            "stanza": "queue=aggQueue",
+            "setting": "maxSize",
+            "expected_value": "100MB",
+            "level": "WARN",
+            "message": "server.conf [queue=aggQueue] maxSize should be set to at least 100MB"
+        },
+        {
+            "filename": "server",
+            "stanza": "queue=parsingQueue",
+            "setting": "maxSize",
+            "expected_value": "100MB",
+            "level": "WARN",
+            "message": "server.conf [queue=parsingQueue] maxSize should be set to at least 100MB"
+        },
+        {
+            "filename": "server",
+            "stanza": "queue=httpInputQ",
+            "setting": "maxSize",
+            "expected_value": "100MB",
+            "level": "WARN",
+            "message": "server.conf [queue=httpInputQ] maxSize should be set to at least 100MB"
+        },
+        {
+            "filename": "server",
+            "stanza": "queue=rulesetQueue",
+            "setting": "maxSize",
+            "expected_value": "100MB",
+            "level": "WARN",
+            "message": "server.conf [queue=rulesetQueue] maxSize should be set to at least 100MB"
+        },
+        {
+            "filename": "server",
+            "stanza": "queue=typingQueue",
+            "setting": "maxSize",
+            "expected_value": "100MB",
+            "level": "WARN",
+            "message": "server.conf [queue=typingQueue] maxSize should be set to at least 100MB"
+        }
+    ]
+}

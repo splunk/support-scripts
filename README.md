@@ -6,6 +6,7 @@ A curated collection of diagnostic and administrative tools for Splunk environme
 
 - [Splunk Support Scripts](#splunk-support-scripts)
   - [Table of Contents](#table-of-contents)
+  - [Getting Started](#getting-started)
   - [Available Tools](#available-tools)
     - [Configuration \& Security](#configuration--security)
     - [User \& Permission Management](#user--permission-management)
@@ -14,7 +15,6 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Performance \& Diagnostics](#performance--diagnostics)
     - [Testing \& Validation](#testing--validation)
   - [General Requirements](#general-requirements)
-  - [Getting Help](#getting-help)
   - [Contributing](#contributing)
     - [Adding a New Script](#adding-a-new-script)
     - [README Template](#readme-template)
@@ -22,8 +22,34 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Submitting Scripts](#submitting-scripts)
   - [Authors](#authors)
   - [Changelog](#changelog)
+    - [v1.2.0 - 2025-11-21](#v120---2025-11-21)
     - [v1.1.0 - 2025-11-18](#v110---2025-11-18)
     - [v1.0.0 - Initial Release](#v100---initial-release)
+
+## Getting Started
+
+Clone and navigate to the repository:
+
+```bash
+git clone https://github.com/splunk/support-scripts.git
+cd support-scripts
+```
+
+**Bash script example:**
+
+```bash
+cd test-peers
+./testpeers.sh
+```
+
+**Python script example:**
+
+```bash
+cd kvcertverify
+$SPLUNK_HOME/bin/python kvcertverify.py --help
+```
+
+Requires Splunk Enterprise access. See individual tool READMEs for detailed usage.
 
 ## Available Tools
 
@@ -110,10 +136,6 @@ Most scripts require one or more of:
 
 Refer to individual tool documentation for specific requirements.
 
-## Getting Help
-
-Each tool has its own README with detailed usage instructions, parameters, and troubleshooting guidance. Navigate to the tool's directory and review the README.md file.
-
 ## Contributing
 
 Team members can contribute new scripts by following these guidelines:
@@ -199,10 +221,17 @@ Send scripts to the repository maintainer for review. Include:
 ## Authors
 
 - Tyler Ezell (tezell@splunk.com) - Initial scripts and maintenance
-- Rob Hilgefort (rhilgefort@splunk.com) - Repository setup, review, and stewardship
 - Robert Phillips (rphillips@splunk.com) - Performance diagnostics and stack collection tools
+- Niclas Andersson (nandersson@splunk.com)
+- Rob Hilgefort (rhilgefort@splunk.com) - Repository setup, review, and stewardship
 
 ## Changelog
+
+### v1.2.0 - 2025-11-21
+
+**Updated:**
+
+- `README.md` - Added table of contents, getting started section, and changelog
 
 ### v1.1.0 - 2025-11-18
 
