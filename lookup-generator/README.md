@@ -11,6 +11,14 @@ Quickly create sizeable lookup files with sample data to:
 - Develop and test dashboards with realistic data volumes
 - Benchmark search performance with large lookups
 
+## Disclaimer
+
+Scripts are for troubleshooting purposes only and do not make any changes to a customer environment outside of writing output to a log file or generate test data (test data must follow guidelines of rule 2).
+
+If a script generates test data, it must not include customer data, and it is expressly meant for lab testing. If test data needs to be generated within the customers environment, written permission from the customer on the case is required. README files for data generation scripts must explicitly state customer permission requirements.
+
+**This script generates test data. Customer permission is required before running in a customer environment.**
+
 ## Requirements
 
 - Bash shell

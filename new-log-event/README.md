@@ -11,6 +11,14 @@ Create Windows event log entries of specific sizes to:
 - Generate test data for Windows event dashboards
 - Troubleshoot event ingestion pipelines
 
+## Disclaimer
+
+Scripts are for troubleshooting purposes only and do not make any changes to a customer environment outside of writing output to a log file or generate test data (test data must follow guidelines of rule 2).
+
+If a script generates test data, it must not include customer data, and it is expressly meant for lab testing. If test data needs to be generated within the customers environment, written permission from the customer on the case is required. README files for data generation scripts must explicitly state customer permission requirements.
+
+**This script generates test data. Customer permission is required before running in a customer environment.**
+
 ## Requirements
 
 - Windows operating system
@@ -59,6 +67,7 @@ Event written to Application with size 8000 characters
 ## Notes
 
 - **Always requires Administrator privileges** - script validates elevation before running
+- **Cannot write to Windows Security logs** - security limitation built into the cmdlet
 - Creating new event sources requires admin rights (one-time per source name)
 - Events appear in Windows Event Viewer under specified log
 - Script uses Event ID 1001 for all generated events

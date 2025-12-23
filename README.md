@@ -93,10 +93,7 @@ Requires Splunk Enterprise access. See individual tool READMEs for detailed usag
 
 ### Performance & Diagnostics
 
-**[Debugging Splunk - Stack Collection Tool](debugging-splunk/README.md)** - Advanced pstack collection for main splunkd (Linux only)
-
-- **Problem**: Need detailed user-space stack traces from splunkd for debugging lock contention, deadlocks, and thread issues
-- **Solution**: Advanced collection tool with multiple modes (batch, continuous, Docker), sophisticated sampling, and optional process freezing
+**Note:** For advanced stack collection tools, see [Splunk UF Diagnosability Tools](https://github.com/splunk/uf-diagnosability)
 
 **[Kernel Stacks - D-State Monitor](kernel-stacks/README.md)** - Monitor D-state processes and collect kernel stacks (Linux only)
 
@@ -207,7 +204,7 @@ Explain the problem this tool solves and use cases.
 - Cross-platform compatibility when possible (test on Linux/macOS)
 - Clear comments for complex logic
 - Security best practices (avoid hardcoded credentials, validate inputs)
-- Scripts cannot change customer environment apart from creating logging files
+- Scripts cannot change customer environment apart from creating logging files. [See AI usage guidelines](https://cisco.sharepoint.com/sites/AIML/SitePages/ApprovedGAITools.aspx?csf=1&web=1&e=3jDh3H)
 - When using python, if at all possible, use the python packaged with Splunk for consistencies sake
 
 ### Submitting Scripts
@@ -226,6 +223,19 @@ Send scripts to the repository maintainer for review. Include:
 - Rob Hilgefort (rhilgefort@splunk.com) - Repository setup, review, and stewardship
 
 ## Changelog
+
+### v1.3.0 - 2025-12-22
+
+**Updated:**
+
+- `README.md` - Added AI usage guidelines link to contributing section
+- `splunk_config_checker` - Added rule-based validation system with configurable rules
+- `new-log-event/README.md` - Added disclaimer for test data generation and Security log limitation note
+- `lookup-generator/README.md` - Added disclaimer for test data generation
+
+**Removed:**
+
+- `debugging-splunk` - Removed in favor of upstream repo at https://github.com/splunk/uf-diagnosability
 
 ### v1.2.0 - 2025-11-21
 
