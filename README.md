@@ -22,6 +22,7 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Submitting Scripts](#submitting-scripts)
   - [Authors](#authors)
   - [Changelog](#changelog)
+    - [v1.3.0 - 2025-12-22](#v130---2025-12-22)
     - [v1.2.0 - 2025-11-21](#v120---2025-11-21)
     - [v1.1.0 - 2025-11-18](#v110---2025-11-18)
     - [v1.0.0 - Initial Release](#v100---initial-release)
