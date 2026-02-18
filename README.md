@@ -12,6 +12,7 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [User \& Permission Management](#user--permission-management)
     - [Input \& Data Management](#input--data-management)
     - [Cluster \& Network Diagnostics](#cluster--network-diagnostics)
+    - [Storage \& Volume Management](#storage--volume-management)
     - [Performance \& Diagnostics](#performance--diagnostics)
     - [Testing \& Validation](#testing--validation)
   - [General Requirements](#general-requirements)
@@ -22,6 +23,7 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Submitting Scripts](#submitting-scripts)
   - [Authors](#authors)
   - [Changelog](#changelog)
+    - [v1.4.0 - 2026-02-18](#v140---2026-02-18)
     - [v1.3.0 - 2025-12-22](#v130---2025-12-22)
     - [v1.2.0 - 2025-11-21](#v120---2025-11-21)
     - [v1.1.0 - 2025-11-18](#v110---2025-11-18)
@@ -91,6 +93,13 @@ Requires Splunk Enterprise access. See individual tool READMEs for detailed usag
 
 - **Problem**: Need to verify distributed search peer connectivity
 - **Solution**: Auto-discovers peers and tests TCP connectivity on port 8089
+
+### Storage & Volume Management
+
+**[Volume Mapper](volmapper/README.md)** - Map Splunk index paths to filesystem mount points and types
+
+- **Problem**: Need visibility into how Splunk indexes map to underlying storage volumes across hot, cold, and frozen tiers
+- **Solution**: Uses btool and findmnt to show each index's storage mount point and filesystem type
 
 ### Performance & Diagnostics
 
@@ -224,6 +233,12 @@ Send scripts to the repository maintainer for review. Include:
 - Rob Hilgefort (rhilgefort@splunk.com) - Repository setup, review, and stewardship
 
 ## Changelog
+
+### v1.4.0 - 2026-02-18
+
+**Added:**
+
+- `volmapper` - Map Splunk index paths to filesystem mount points and types across hot, cold, and frozen tiers
 
 ### v1.3.0 - 2025-12-22
 
