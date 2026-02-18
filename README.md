@@ -11,6 +11,7 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Configuration \& Security](#configuration--security)
     - [User \& Permission Management](#user--permission-management)
     - [Input \& Data Management](#input--data-management)
+    - [Data Privacy](#data-privacy)
     - [Cluster \& Network Diagnostics](#cluster--network-diagnostics)
     - [Storage \& Volume Management](#storage--volume-management)
     - [Performance \& Diagnostics](#performance--diagnostics)
@@ -86,6 +87,13 @@ Requires Splunk Enterprise access. See individual tool READMEs for detailed usag
 
 - **Problem**: Need large test lookup files for performance testing
 - **Solution**: Generates CSV files with randomized data up to specified size (default 14MB)
+
+### Data Privacy
+
+**[Log Redactor](log-redactor/README.md)** - Redact sensitive information from log files
+
+- **Problem**: Need to remove PII (IPs, hostnames, emails, etc.) from log files before sharing
+- **Solution**: Regex-based redactor with consistent ID mapping across the file for trackability
 
 ### Cluster & Network Diagnostics
 
@@ -239,6 +247,7 @@ Send scripts to the repository maintainer for review. Include:
 **Added:**
 
 - `volmapper` - Map Splunk index paths to filesystem mount points and types across hot, cold, and frozen tiers
+- `log-redactor` - Redact sensitive information (IPs, hostnames, emails, GUIDs, MACs) from log files
 
 ### v1.3.0 - 2025-12-22
 
