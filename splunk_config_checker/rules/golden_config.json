@@ -1,0 +1,316 @@
+{
+    "rules": [
+        {
+            "filename": "distsearch",
+            "stanza": "distributedSearch",
+            "setting": "statusTimeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "distsearch.conf [distributedSearch] statusTimeout should be set to 120"
+        },
+        {
+            "filename": "distsearch",
+            "stanza": "distributedSearch",
+            "setting": "sendTimeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "distsearch.conf [distributedSearch] sendTimeout should be set to 120"
+        },
+        {
+            "filename": "distsearch",
+            "stanza": "distributedSearch",
+            "setting": "receiveTimeout",
+            "expected_value": 1200,
+            "level": "WARN",
+            "message": "distsearch.conf [distributedSearch] receiveTimeout should be set to 1200"
+        },
+        {
+            "filename": "distsearch",
+            "stanza": "distributedSearch",
+            "setting": "connectionTimeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "distsearch.conf [distributedSearch] connectionTimeout should be set to 120"
+        },
+        {
+            "filename": "distsearch",
+            "stanza": "distributedSearch",
+            "setting": "authTokenConnectionTimeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "distsearch.conf [distributedSearch] authTokenConnectionTimeout should be set to 120"
+        },
+        {
+            "filename": "distsearch",
+            "stanza": "distributedSearch",
+            "setting": "authTokenSendTimeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "distsearch.conf [distributedSearch] authTokenSendTimeout should be set to 120"
+        },
+        {
+            "filename": "distsearch",
+            "stanza": "distributedSearch",
+            "setting": "authTokenReceiveTimeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "distsearch.conf [distributedSearch] authTokenReceiveTimeout should be set to 120"
+        },
+        {
+            "filename": "distsearch",
+            "stanza": "replicationSettings",
+            "setting": "connectionTimeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "distsearch.conf [replicationSettings] connectionTimeout should be set to 120"
+        },
+        {
+            "filename": "distsearch",
+            "stanza": "replicationSettings",
+            "setting": "sendRcvTimeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "distsearch.conf [replicationSettings] sendRcvTimeout should be set to 120"
+        },
+        {
+            "filename": "limits",
+            "stanza": "search",
+            "setting": "remote_timeline_connection_timeout",
+            "expected_value": 30,
+            "level": "WARN",
+            "message": "limits.conf [search] remote_timeline_connection_timeout should be set to 30"
+        },
+        {
+            "filename": "limits",
+            "stanza": "search",
+            "setting": "remote_timeline_send_timeout",
+            "expected_value": 30,
+            "level": "WARN",
+            "message": "limits.conf [search] remote_timeline_send_timeout should be set to 30"
+        },
+        {
+            "filename": "limits",
+            "stanza": "scheduler",
+            "setting": "async_saved_search_fetch",
+            "expected_value": true,
+            "level": "WARN",
+            "message": "limits.conf [scheduler] async_saved_search_fetch should be set to true"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "cxn_timeout_raft",
+            "expected_value": 30,
+            "level": "WARN",
+            "message": "server.conf [shclustering] cxn_timeout_raft should be set to 30"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "send_timeout_raft",
+            "expected_value": 30,
+            "level": "WARN",
+            "message": "server.conf [shclustering] send_timeout_raft should be set to 30"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "rcv_timeout_raft",
+            "expected_value": 30,
+            "level": "WARN",
+            "message": "server.conf [shclustering] rcv_timeout_raft should be set to 30"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "captain_is_adhoc_searchhead",
+            "expected_value": true,
+            "level": "WARN",
+            "message": "server.conf [shclustering] captain_is_adhoc_searchhead should be set to true"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "cxn_timeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "server.conf [shclustering] cxn_timeout should be set to 120"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "election_timeout_ms",
+            "expected_value": 120000,
+            "level": "WARN",
+            "message": "server.conf [shclustering] election_timeout_ms should be set to 120000"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "heartbeat_timeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "server.conf [shclustering] heartbeat_timeout should be set to 120"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "executor_workers",
+            "expected_value": "<3 x number of SHC nodes>",
+            "level": "WARN",
+            "message": "server.conf [shclustering] executor_workers should be set to 3 * number of SHC nodes"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "replication_factor",
+            "expected_value": 2,
+            "level": "WARN",
+            "message": "server.conf [shclustering] replication_factor should be set to 2"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "send_timeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "server.conf [shclustering] send_timeout should be set to 120"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "rcv_timeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "server.conf [shclustering] rcv_timeout should be set to 120"
+        },
+        {
+            "filename": "server",
+            "stanza": "shclustering",
+            "setting": "deployerPushThreads",
+            "expected_value": "auto",
+            "level": "WARN",
+            "message": "server.conf [shclustering] deployerPushThreads should be set to auto"
+        },
+        {
+            "filename": "server",
+            "stanza": "httpServer",
+            "setting": "busyKeepAliveIdleTimeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "server.conf [httpServer] busyKeepAliveIdleTimeout should be set to 120"
+        },
+        {
+            "filename": "server",
+            "stanza": "httpServer",
+            "setting": "streamInWriteTimeout",
+            "expected_value": 30,
+            "level": "WARN",
+            "message": "server.conf [httpServer] streamInWriteTimeout should be set to 30"
+        },
+        {
+            "filename": "server",
+            "stanza": "sslConfig",
+            "setting": "useClientSSLCompression",
+            "expected_value": false,
+            "level": "WARN",
+            "message": "server.conf [sslConfig] useClientSSLCompression should be set to false"
+        },
+        {
+            "filename": "server",
+            "stanza": "sslConfig",
+            "setting": "sslServerHandshakeTimeout",
+            "expected_value": 120,
+            "level": "WARN",
+            "message": "server.conf [sslConfig] sslServerHandshakeTimeout should be set to 120"
+        },
+        {
+            "filename": "server",
+            "stanza": "clustering",
+            "setting": "heartbeat_period",
+            "expected_value": 10,
+            "level": "WARN",
+            "message": "server.conf [clustering] heartbeat_period should be set to 10"
+        },
+        {
+            "filename": "server",
+            "stanza": "clustering",
+            "setting": "cxn_timeout",
+            "expected_value": 300,
+            "level": "WARN",
+            "message": "server.conf [clustering] cxn_timeout should be set to 300"
+        },
+        {
+            "filename": "server",
+            "stanza": "clustering",
+            "setting": "send_timeout",
+            "expected_value": 300,
+            "level": "WARN",
+            "message": "server.conf [clustering] send_timeout should be set to 300"
+        },
+        {
+            "filename": "server",
+            "stanza": "clustering",
+            "setting": "rcv_timeout",
+            "expected_value": 300,
+            "level": "WARN",
+            "message": "server.conf [clustering] rcv_timeout should be set to 300"
+        },
+        {
+            "filename": "server",
+            "stanza": "clustering",
+            "setting": "heartbeat_timeout",
+            "expected_value": 300,
+            "level": "WARN",
+            "message": "server.conf [clustering] heartbeat_timeout should be set to 300"
+        },
+        {
+            "filename": "inputs",
+            "stanza": "http",
+            "setting": "dedicatedIoThreads",
+            "expected_value": "<number of CPU cores on host>",
+            "level": "WARN",
+            "message": "inputs.conf [http] dedicatedIoThreads should be set to the number of CPU cores on the host machine"
+        },
+        {
+            "filename": "inputs",
+            "stanza": "http",
+            "setting": "busyKeepAliveIdleTimeout",
+            "expected_value": "<load balancer idle timeout + 5s>",
+            "level": "WARN",
+            "message": "inputs.conf [http] busyKeepAliveIdleTimeout should be set to load balancer connection idle timeout + 5 seconds"
+        },
+        {
+            "filename": "inputs",
+            "stanza": "http",
+            "setting": "queueSize",
+            "expected_value": "10MB",
+            "level": "WARN",
+            "message": "inputs.conf [http] queueSize should be set to 10MB"
+        },
+        {
+            "filename": "server",
+            "stanza": "general",
+            "setting": "parallelIngestionPipelines",
+            "expected_value": 2,
+            "level": "WARN",
+            "message": "server.conf [general] parallelIngestionPipelines should be set to 2"
+        },
+        {
+            "filename": "limits",
+            "stanza": "input_channels",
+            "setting": "max_inactive",
+            "expected_value": 100000,
+            "level": "WARN",
+            "message": "limits.conf [input_channels] max_inactive should be set to 100000"
+        },
+        {
+            "filename": "limits",
+            "stanza": "input_channels",
+            "setting": "lowater_inactive",
+            "expected_value": 90000,
+            "level": "WARN",
+            "message": "limits.conf [input_channels] lowater_inactive should be set to 90000"
+        }
+    ]
+}
