@@ -105,11 +105,28 @@ The checker supports different value types:
 
 Values are compared case-insensitively for boolean values ("true"/"false").
 
+## Available Rule Sets
+
+Pre-built rule sets are available in the `rules/` directory:
+
+- **`rules/golden_config.json`** - Standard "golden config" tuning recommendations covering Search Heads, Indexers, Cluster Manager, SHC Deployer, and HEC receivers. Source: [splunk-golden-config-tuning](https://github.com/rephillips/splunk-golden-config-tuning)
+- **`rules/hec_performance_tuning.json`** - HEC-specific performance tuning (dedicated I/O threads, queue sizes, ingestion pipelines)
+
+To use a rule set:
+
+```python
+checker = SplunkConfigChecker(splunk_home, Path("rules/golden_config.json"))
+results = checker.check_configurations()
+checker.print_results(results)
+```
+
+> **Note:** Some rules in `golden_config.json` use placeholder values (e.g., `<number of CPU cores on host>`) that must be customized for your environment before running checks.
+
 ## Adding New Rules
 
 To add new configuration checks:
 
-1. Open `config_rules.json`
+1. Open `config_rules.json` or create a new file in the `rules/` directory
 2. Add a new rule object to the `rules` array
 3. Include all required fields (filename, stanza, setting, expected_value)
 4. Add optional fields (level, message) as needed

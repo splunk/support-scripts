@@ -68,6 +68,7 @@ Requires Splunk Enterprise access. See individual tool READMEs for detailed usag
 
 - **Problem**: Need to validate Splunk configurations across multiple conf files
 - **Solution**: JSON-based rule validator with custom severity levels and detailed reporting
+- **Includes**: Golden config tuning recommendations and HEC performance tuning rule sets
 
 ### User & Permission Management
 
@@ -241,6 +242,12 @@ Send scripts to the repository maintainer for review. Include:
 - Rob Hilgefort (rhilgefort@splunk.com) - Repository setup, review, and stewardship
 
 ## Changelog
+
+### v1.5.0 - 2026-04-01
+
+**Added:**
+
+- `splunk_config_checker/rules/golden_config.json` - Standard golden config tuning recommendations for Search Heads, Indexers, Cluster Manager, SHC Deployer, and HEC receivers
 
 ### v1.4.0 - 2026-02-18
 
