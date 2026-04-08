@@ -111,6 +111,7 @@ Pre-built rule sets are available in the `rules/` directory:
 
 - **`rules/golden_config.json`** - Standard "golden config" tuning recommendations covering Search Heads, Indexers, Cluster Manager, SHC Deployer, and HEC receivers. Source: [splunk-golden-config-tuning](https://github.com/rephillips/splunk-golden-config-tuning)
 - **`rules/hec_performance_tuning.json`** - HEC-specific performance tuning (dedicated I/O threads, queue sizes, ingestion pipelines)
+- **`rules/kvstore.json`** - KV Store upgrade pre-flight checks. Validates the `server.conf [sslConfig]` SSL compression settings required before upgrading KV Store from 4/4.2 to 7. Used internally by the `kvcertverify` tool.
 
 To use a rule set:
 

@@ -24,6 +24,8 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Submitting Scripts](#submitting-scripts)
   - [Authors](#authors)
   - [Changelog](#changelog)
+    - [v1.6.0 - 2026-04-08](#v160---2026-04-08)
+    - [v1.5.0 - 2026-04-01](#v150---2026-04-01)
     - [v1.4.0 - 2026-02-18](#v140---2026-02-18)
     - [v1.3.0 - 2025-12-22](#v130---2025-12-22)
     - [v1.2.0 - 2025-11-21](#v120---2025-11-21)
@@ -68,7 +70,7 @@ Requires Splunk Enterprise access. See individual tool READMEs for detailed usag
 
 - **Problem**: Need to validate Splunk configurations across multiple conf files
 - **Solution**: JSON-based rule validator with custom severity levels and detailed reporting
-- **Includes**: Golden config tuning recommendations and HEC performance tuning rule sets
+- **Includes**: Golden config tuning, HEC performance tuning, and KV Store upgrade pre-flight rule sets
 
 ### User & Permission Management
 
@@ -242,6 +244,13 @@ Send scripts to the repository maintainer for review. Include:
 - Rob Hilgefort (rhilgefort@splunk.com) - Repository setup, review, and stewardship
 
 ## Changelog
+
+### v1.6.0 - 2026-04-08
+
+**Updated:**
+
+- `kvcertverify` - Added certificate expiry checks, cert purpose validation with OpenSSL fallback, disk space check, live KVStore/SHC status checks, SSL compression config validation, and SSL server name verification for non-default certs; fixed false positives
+- `splunk_config_checker` - Added KV Store upgrade pre-flight rule set (`rules/kvstore.json`)
 
 ### v1.5.0 - 2026-04-01
 

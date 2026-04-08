@@ -242,7 +242,6 @@ class SplunkConfigChecker:
             level_str = result.rule.level.value
             if result.passed:
                 print(f"{Colors.GREEN}[INFO] {result.message}{Colors.ENDC}")
-
             else:
                 print(f"{Colors.RED}[{level_str}] {result.message}{Colors.ENDC}")
 
