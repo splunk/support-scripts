@@ -20,7 +20,9 @@ import argparse
 import configparser
 import subprocess
 import re
+import shutil
 import ipaddress
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
@@ -29,7 +31,7 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-from splunk_config_checker.checker import SplunkConfigChecker
+from splunk_config_checker.splunk_config_checker import SplunkConfigChecker
 
 # Try to import cryptography library, fall back to OpenSSL commands if not available
 try:
@@ -43,6 +45,19 @@ try:
 except ImportError:
     HAS_CRYPTOGRAPHY = False
     print("Warning: cryptography library not available, using OpenSSL fallback")
+
+
+# Issuer fields present on Splunk's bundled self-signed CA (SplunkCommonCA).
+# If server.pem is signed by this CA the deployment is using Splunk's default
+# certificates, which do NOT require sslVerifyServerName = true.
+SPLUNK_DEFAULT_CA_ISSUER = {
+    "C": "US",
+    "ST": "CA",
+    "L": "San Francisco",
+    "O": "Splunk",
+    "CN": "SplunkCommonCA",
+    "emailAddress": "support@splunk.com",
+}
 
 
 class Colors:
@@ -67,30 +82,57 @@ class CertificateVerifier:
         self.warnings = []
         self.info = []
         self.splunk_version = None
+        self.splunk_db = self._resolve_splunk_db()
+
+    def _resolve_splunk_db(self) -> str:
+        """Determine SPLUNK_DB from splunk-launch.conf, env var, or default"""
+        # 1. Try environment variable first
+        env_val = os.environ.get("SPLUNK_DB", "")
+        if env_val:
+            return env_val
+
+        # 2. Read from splunk-launch.conf (Splunk's canonical source)
+        launch_conf = self.splunk_home / "etc" / "splunk-launch.conf"
+        if launch_conf.exists():
+            try:
+                with open(launch_conf, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith("SPLUNK_DB") and "=" in line:
+                            val = line.split("=", 1)[1].strip()
+                            # Expand $SPLUNK_HOME if present in the value
+                            val = val.replace("$SPLUNK_HOME", str(self.splunk_home))
+                            if val:
+                                return val
+            except OSError:
+                pass
+
+        # 3. Default
+        return str(self.splunk_home / "var" / "lib" / "splunk")
 
     def log_error(self, message: str):
         """Log an error message"""
         self.errors.append(message)
-        print(f"{Colors.RED}ERROR: {message}{Colors.ENDC}")
+        print(f"{Colors.RED}[ERROR] {message}{Colors.ENDC}")
 
     def log_warning(self, message: str):
         """Log a warning message"""
         self.warnings.append(message)
-        print(f"{Colors.YELLOW}WARNING: {message}{Colors.ENDC}")
+        print(f"{Colors.YELLOW}[WARN] {message}{Colors.ENDC}")
 
     def log_info(self, message: str):
         """Log an info message"""
         self.info.append(message)
-        print(f"{Colors.BLUE}INFO: {message}{Colors.ENDC}")
+        print(f"{Colors.BLUE}[INFO] {message}{Colors.ENDC}")
 
     def log_success(self, message: str):
         """Log a success message"""
-        print(f"{Colors.GREEN}SUCCESS: {message}{Colors.ENDC}")
+        print(f"{Colors.GREEN}[INFO] {message}{Colors.ENDC}")
 
     def log_debug(self, message: str):
         """Log a debug message (only in verbose mode)"""
         if self.verbose:
-            print(f"{Colors.CYAN}DEBUG: {message}{Colors.ENDC}")
+            print(f"{Colors.CYAN}[DEBUG] {message}{Colors.ENDC}")
 
     def get_splunk_version(self) -> Optional[str]:
         """Get Splunk version from VERSION file"""
@@ -318,7 +360,7 @@ class CertificateVerifier:
     ) -> bool:
         """Verify certificate chain using Splunk's OpenSSL"""
         success, stdout, stderr = self._run_openssl_command(
-            ["verify", "-CAfile", ca_cert_path, server_cert_path]
+            ["verify", "-verbose", "-CAfile", ca_cert_path, server_cert_path]
         )
 
         if success and f"{server_cert_path}: OK" in stdout:
@@ -516,6 +558,164 @@ class CertificateVerifier:
             self.log_error(f"Error loading CA certificate {ca_path}: {e}")
             return None
 
+    def is_splunk_default_cert(self, cert) -> bool:
+        """Return True if server.pem is signed by Splunk's built-in SplunkCommonCA."""
+        if not HAS_CRYPTOGRAPHY:
+            # OpenSSL fallback: parse 'openssl x509 -noout -issuer' output
+            if not isinstance(cert, dict) or not cert.get("path"):
+                return False
+            success, stdout, _ = self._run_openssl_command(
+                ["x509", "-in", cert["path"], "-noout", "-issuer"]
+            )
+            if not success:
+                return False
+            # stdout example: "issuer=C = US, ST = CA, L = San Francisco, ..."
+            issuer_str = stdout.strip()
+            if issuer_str.lower().startswith("issuer="):
+                issuer_str = issuer_str[7:]
+            parsed: Dict[str, str] = {}
+            for part in issuer_str.split(","):
+                part = part.strip()
+                if "=" in part:
+                    k, _, v = part.partition("=")
+                    parsed[k.strip()] = v.strip()
+            return parsed == SPLUNK_DEFAULT_CA_ISSUER
+
+        # cryptography library path
+        try:
+            from cryptography.x509.oid import NameOID
+            oid_map = {
+                NameOID.COUNTRY_NAME: "C",
+                NameOID.STATE_OR_PROVINCE_NAME: "ST",
+                NameOID.LOCALITY_NAME: "L",
+                NameOID.ORGANIZATION_NAME: "O",
+                NameOID.COMMON_NAME: "CN",
+                NameOID.EMAIL_ADDRESS: "emailAddress",
+            }
+            parsed = {
+                oid_map[attr.oid]: attr.value
+                for attr in cert.issuer
+                if attr.oid in oid_map
+            }
+            return parsed == SPLUNK_DEFAULT_CA_ISSUER
+        except Exception as e:
+            self.log_debug(f"Could not parse cert issuer for default-cert check: {e}")
+            return False
+
+    def check_ssl_verify_server_name(self, config: Dict, cert) -> bool:
+        """Error if a custom cert is in use and sslVerifyServerName is not true in [sslConfig].
+
+        Custom (non-Splunk-default) certificates require sslVerifyServerName = true
+        in server.conf [sslConfig]; without it the KV Store upgrade can fail.
+        """
+        if self.is_splunk_default_cert(cert):
+            self.log_info(
+                "server.pem is signed by SplunkCommonCA (default cert); "
+                "sslVerifyServerName is not required"
+            )
+            return True
+
+        verify = self.get_config_value(config, "sslConfig", "sslVerifyServerName", "")
+        if verify and verify.lower() == "true":
+            self.log_success(
+                "Custom certificate detected and sslVerifyServerName = true in [sslConfig]"
+            )
+            return True
+
+        msg = (
+            "Custom certificate detected in [sslConfig] but sslVerifyServerName is not set "
+            "to true. This can break the KV Store upgrade. "
+            "Set sslVerifyServerName = true in server.conf [sslConfig]."
+        )
+        self.log_error(msg)
+        return False
+
+    def _check_certificate_purpose_openssl(self, cert_path: str) -> Dict[str, bool]:
+        """Check certificate purpose using OpenSSL (fallback when cryptography lib unavailable)"""
+        purposes = {
+            "server_auth": False,
+            "client_auth": False,
+            "no_purpose": False,
+        }
+
+        success, stdout, stderr = self._run_openssl_command(
+            ["x509", "-in", cert_path, "-noout", "-purpose"]
+        )
+        if not success:
+            self.log_warning(
+                f"Could not check certificate purpose for {cert_path}: {stderr}"
+            )
+            purposes["no_purpose"] = True
+            return purposes
+
+        ssl_server_match = re.search(
+            r"^SSL server\s*:\s*(Yes|No)", stdout, re.MULTILINE | re.IGNORECASE
+        )
+        ssl_client_match = re.search(
+            r"^SSL client\s*:\s*(Yes|No)", stdout, re.MULTILINE | re.IGNORECASE
+        )
+
+        if ssl_server_match:
+            purposes["server_auth"] = ssl_server_match.group(1).lower() == "yes"
+        if ssl_client_match:
+            purposes["client_auth"] = ssl_client_match.group(1).lower() == "yes"
+
+        if ssl_server_match is None and ssl_client_match is None:
+            purposes["no_purpose"] = True
+            self.log_info(f"No purpose restrictions found in certificate {cert_path}")
+        else:
+            self.log_debug(
+                f"Certificate purpose for {cert_path}: "
+                f"SSL server={purposes['server_auth']}, SSL client={purposes['client_auth']}"
+            )
+
+        return purposes
+
+    def check_certificate_expiry(self, cert) -> bool:
+        """Check that a certificate has not expired. Returns True if still valid."""
+        now = datetime.now(timezone.utc)
+
+        if not HAS_CRYPTOGRAPHY:
+            if not isinstance(cert, dict):
+                self.log_warning("Cannot check certificate expiry: unexpected cert type")
+                return True
+            expiration_str = cert.get("expiration", "")
+            if not expiration_str:
+                self.log_warning(
+                    "Cannot check certificate expiry: no expiration date available"
+                )
+                return True
+            # Format from OpenSSL: "notAfter=Apr  7 00:00:00 2026 GMT"
+            try:
+                date_str = expiration_str.split("=", 1)[1].strip()
+                expiry = datetime.strptime(date_str, "%b %d %H:%M:%S %Y %Z").replace(
+                    tzinfo=timezone.utc
+                )
+            except (ValueError, IndexError) as e:
+                self.log_warning(
+                    f"Could not parse certificate expiry date '{expiration_str}': {e}"
+                )
+                return True
+        else:
+            try:
+                expiry = cert.not_valid_after_utc
+            except AttributeError:
+                # Older cryptography versions use a naive datetime (UTC)
+                expiry = cert.not_valid_after.replace(tzinfo=timezone.utc)
+
+        if expiry < now:
+            msg = f"Certificate has EXPIRED on {expiry.strftime('%Y-%m-%d')}"
+            self.log_error(msg)
+            self.errors.append(msg)
+            return False
+
+        days_remaining = (expiry - now).days
+        self.log_success(
+            f"Certificate is valid (expires {expiry.strftime('%Y-%m-%d')}, "
+            f"{days_remaining} days remaining)"
+        )
+        return True
+
     def check_certificate_purpose(self, cert) -> Dict[str, bool]:
         """Check certificate key usage and extended key usage"""
         purposes = {
@@ -525,11 +725,10 @@ class CertificateVerifier:
         }
 
         if not HAS_CRYPTOGRAPHY:
-            # Fallback: assume default certificate is OK for any purpose
+            if isinstance(cert, dict) and cert.get("path"):
+                return self._check_certificate_purpose_openssl(cert["path"])
             purposes["no_purpose"] = True
-            self.log_info(
-                "Certificate purpose check skipped (cryptography library not available)"
-            )
+            self.log_warning("Certificate purpose check skipped: no cert path available")
             return purposes
 
         try:
@@ -782,8 +981,11 @@ class CertificateVerifier:
             "ssl_renegotiation_ok": False,
             "server_cert_exists": False,
             "server_cert_valid": False,
+            "server_cert_not_expired": False,
+            "ssl_verify_server_name_ok": False,
             "ca_cert_exists": False,
             "ca_cert_valid": False,
+            "ca_cert_not_expired": False,
             "cert_chain_valid": False,
         }
 
@@ -834,6 +1036,8 @@ class CertificateVerifier:
                 cert = self.load_certificate(full_cert_path)
                 if cert:
                     results["server_cert_valid"] = True
+                    results["server_cert_not_expired"] = self.check_certificate_expiry(cert)
+                    results["ssl_verify_server_name_ok"] = self.check_ssl_verify_server_name(config, cert)
                     self.log_success(
                         f"Server certificate loaded successfully from {full_cert_path}"
                     )
@@ -864,6 +1068,7 @@ class CertificateVerifier:
                             ca_cert = self.load_ca_certificate(ca_full_path, cert)
                             if ca_cert:
                                 results["ca_cert_valid"] = True
+                                results["ca_cert_not_expired"] = self.check_certificate_expiry(ca_cert)
                                 if self.verify_certificate_chain(cert, ca_cert):
                                     results["cert_chain_valid"] = True
                                     self.log_success(
@@ -894,10 +1099,12 @@ class CertificateVerifier:
             "section_exists": False,
             "server_cert_exists": False,
             "server_cert_valid": False,
+            "server_cert_not_expired": False,
             "server_cert_purpose_ok": False,
             "server_cert_san_ok": False,
             "ca_cert_exists": False,
             "ca_cert_valid": False,
+            "ca_cert_not_expired": False,
             "ca_cert_purpose_ok": False,
             "cert_chain_valid": False,
             "verify_server_name_disabled": False,
@@ -1040,8 +1247,8 @@ class CertificateVerifier:
                 "verifyServerName is disabled in [kvstore] - SAN requirements relaxed"
             )
 
-        # Check server certificate
-        server_cert_path = self.get_config_value(config, "kvstore", "serverCert")
+        # Check server certificate (optional — no warning if absent)
+        server_cert_path = self.get_config_value(config, "kvstore", "serverCert", "")
         if server_cert_path:
             results["server_cert_exists"] = True
             full_cert_path = self.resolve_path(server_cert_path)
@@ -1050,6 +1257,7 @@ class CertificateVerifier:
                 cert = self.load_certificate(full_cert_path)
                 if cert:
                     results["server_cert_valid"] = True
+                    results["server_cert_not_expired"] = self.check_certificate_expiry(cert)
                     self.log_success(
                         f"KV Store server certificate loaded successfully from {full_cert_path}"
                     )
@@ -1091,6 +1299,7 @@ class CertificateVerifier:
                             ca_cert = self.load_ca_certificate(ca_full_path, cert)
                             if ca_cert:
                                 results["ca_cert_valid"] = True
+                                results["ca_cert_not_expired"] = self.check_certificate_expiry(ca_cert)
 
                                 # Check CA certificate purposes
                                 ca_purposes = self.check_certificate_purpose(ca_cert)
@@ -1350,6 +1559,226 @@ class CertificateVerifier:
             self.log_error(f"Error parsing Splunk version {self.splunk_version}: {e}")
             return False
 
+    def check_kvstore_disk_space(self, config: Dict) -> Optional[bool]:
+        """Check that at least 50% of disk space is free on the KVStore data path filesystem.
+
+        Returns True (sufficient), False (insufficient), or None (could not determine).
+        """
+        kvstore_db_path = None
+        if "kvstore" in config:
+            kvstore_db_path = config["kvstore"].get("dbPath")
+
+        if not kvstore_db_path:
+            # Default: SPLUNK_DB/kvstore
+            kvstore_db_path = str(Path(self.splunk_db) / "kvstore")
+        else:
+            kvstore_db_path = self.resolve_path(kvstore_db_path)
+
+        self.log_info(f"Checking disk space for KVStore path: {kvstore_db_path}")
+
+        # Walk up to find an existing ancestor if the path itself doesn't exist yet
+        check_path = kvstore_db_path
+        while check_path and check_path != os.path.dirname(check_path):
+            if os.path.exists(check_path):
+                break
+            check_path = os.path.dirname(check_path)
+
+        if not check_path or not os.path.exists(check_path):
+            self.log_warning(
+                f"Cannot check disk space: KVStore path not reachable: {kvstore_db_path}"
+            )
+            return None
+
+        try:
+            usage = shutil.disk_usage(check_path)
+            free_pct = usage.free / usage.total
+            free_gb = usage.free / (1024 ** 3)
+            total_gb = usage.total / (1024 ** 3)
+            if free_pct >= 0.50:
+                self.log_success(
+                    f"KVStore disk space OK: {free_pct:.1%} free "
+                    f"({free_gb:.1f} GB free of {total_gb:.1f} GB total) on {check_path}"
+                )
+                return True
+            else:
+                msg = (
+                    f"Insufficient disk space for KVStore: only {free_pct:.1%} free "
+                    f"({free_gb:.1f} GB free of {total_gb:.1f} GB total) on {check_path}. "
+                    "At least 50% free space is required."
+                )
+                self.log_error(msg)
+                self.errors.append(msg)
+                return False
+        except OSError as e:
+            self.log_warning(f"Could not check disk space for {check_path}: {e}")
+            return None
+
+    def check_kvstore_status(self) -> Dict:
+        """Run 'splunk show kvstore-status --verbose' and evaluate the result"""
+        results = {"ran": False, "ready": False, "storage_engine_ok": False, "output": ""}
+        splunk_bin = str(self.splunk_home / "bin" / "splunk")
+        self.log_info("Running: splunk show kvstore-status --verbose")
+        try:
+            result = subprocess.run(
+                [splunk_bin, "show", "kvstore-status", "--verbose"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            output = result.stdout + result.stderr
+            results["output"] = output
+            results["ran"] = True
+
+            if result.returncode != 0:
+                lower = output.lower()
+                if any(
+                    k in lower
+                    for k in ("connection refused", "not running", "splunkd is not running")
+                ):
+                    self.log_warning(
+                        "KVStore status check skipped: splunkd is not running"
+                    )
+                elif "not authorized" in lower or "authentication" in lower:
+                    self.log_warning(
+                        "KVStore status check skipped: authentication required"
+                    )
+                else:
+                    self.log_warning(
+                        f"KVStore status command returned non-zero ({result.returncode}); "
+                        f"output: {output.strip()[:200]}"
+                    )
+                return results
+
+            # Try JSON parse first, then fall back to key-value scanning
+            status_val = None
+            engine_val = None
+            try:
+                import json as _json
+                data = _json.loads(result.stdout)
+                status_val = data.get("status") or data.get("Status")
+                engine_val = data.get("storageEngine") or data.get("storage_engine")
+            except (ValueError, AttributeError):
+                for line in output.splitlines():
+                    ll = line.lower()
+                    if ":" in line:
+                        key, _, val = line.partition(":")
+                        key_norm = key.strip().lower().replace(" ", "").replace("_", "")
+                        val = val.strip()
+                        if key_norm == "status" and status_val is None:
+                            status_val = val
+                        if key_norm == "storageengine" and engine_val is None:
+                            engine_val = val
+
+            if status_val:
+                if status_val.lower() in ("ready", "available"):
+                    results["ready"] = True
+                    self.log_success(f"KVStore status is ready (status={status_val})")
+                else:
+                    msg = f"KVStore is not in ready state: status={status_val}"
+                    self.log_error(msg)
+                    self.errors.append(msg)
+            else:
+                self.log_info("KVStore status: could not determine state from output")
+
+            if engine_val:
+                if "wiredtiger" in engine_val.lower():
+                    results["storage_engine_ok"] = True
+                    self.log_success(f"KVStore storage engine: {engine_val}")
+                else:
+                    self.log_info(f"KVStore storage engine: {engine_val}")
+
+        except subprocess.TimeoutExpired:
+            self.log_warning("KVStore status check timed out")
+        except FileNotFoundError:
+            self.log_warning(f"Splunk binary not found at {splunk_bin}")
+        except Exception as e:
+            self.log_warning(f"KVStore status check failed: {e}")
+
+        return results
+
+    def check_shcluster_status(self) -> Dict:
+        """Run 'splunk show shcluster-status' and evaluate the result"""
+        results = {"ran": False, "applicable": False, "healthy": False, "output": ""}
+        splunk_bin = str(self.splunk_home / "bin" / "splunk")
+        self.log_info("Running: splunk show shcluster-status")
+        try:
+            result = subprocess.run(
+                [splunk_bin, "show", "shcluster-status"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            output = result.stdout + result.stderr
+            results["output"] = output
+            results["ran"] = True
+            lower = output.lower()
+
+            not_member_phrases = (
+                "not a member",
+                "not enabled",
+                "shclustering is not enabled",
+            )
+
+            if result.returncode != 0:
+                if any(k in lower for k in not_member_phrases):
+                    self.log_info(
+                        "SHC status check skipped: this node is not a Search Head Cluster member"
+                    )
+                    return results
+                if any(
+                    k in lower
+                    for k in ("connection refused", "not running", "splunkd is not running")
+                ):
+                    self.log_warning(
+                        "SHC status check skipped: splunkd is not running"
+                    )
+                elif "not authorized" in lower or "authentication" in lower:
+                    self.log_warning(
+                        "SHC status check skipped: authentication required"
+                    )
+                else:
+                    self.log_warning(
+                        f"SHC status command returned non-zero ({result.returncode}); "
+                        f"output: {output.strip()[:200]}"
+                    )
+                return results
+
+            if any(k in lower for k in not_member_phrases):
+                self.log_info(
+                    "SHC status: this node is not a Search Head Cluster member"
+                )
+                return results
+
+            results["applicable"] = True
+            members_up = len(re.findall(r"status\s*:\s*Up", output, re.IGNORECASE))
+            members_down = len(re.findall(r"status\s*:\s*Down", output, re.IGNORECASE))
+            has_captain = bool(
+                re.search(r"is_captain\s*:\s*1|captain\s*:", output, re.IGNORECASE)
+            )
+
+            if members_down > 0:
+                msg = f"SHC has {members_down} member(s) with status DOWN"
+                self.log_error(msg)
+                self.errors.append(msg)
+            elif members_up > 0:
+                results["healthy"] = True
+                self.log_success(
+                    f"SHC status: {members_up} member(s) Up, captain elected={has_captain}"
+                )
+            else:
+                self.log_info(
+                    "SHC status output received but could not parse member statuses"
+                )
+
+        except subprocess.TimeoutExpired:
+            self.log_warning("SHC status check timed out")
+        except FileNotFoundError:
+            self.log_warning(f"Splunk binary not found at {splunk_bin}")
+        except Exception as e:
+            self.log_warning(f"SHC status check failed: {e}")
+
+        return results
+
     def resolve_path(self, path: str) -> str:
         """Resolve relative paths relative to SPLUNK_HOME"""
         if not path:
@@ -1361,12 +1790,19 @@ class CertificateVerifier:
         if os.path.isabs(path):
             resolved_path = path
         else:
-            # Handle paths that contain $SPLUNK_HOME variable
+            # Substitute known Splunk variables before falling back to expandvars
             if "$SPLUNK_HOME" in path:
                 resolved_path = path.replace("$SPLUNK_HOME", str(self.splunk_home))
+            elif "$SPLUNK_DB" in path:
+                resolved_path = path.replace("$SPLUNK_DB", self.splunk_db)
             elif path.startswith("$"):
-                # Handle other environment variables
-                resolved_path = os.path.expandvars(path)
+                # Generic environment variable — try OS expansion
+                expanded = os.path.expandvars(path)
+                if expanded == path:
+                    # Variable was not set; fall back to treating as relative to SPLUNK_HOME
+                    resolved_path = str(self.splunk_home / path.lstrip("$").split("/", 1)[-1])
+                else:
+                    resolved_path = expanded
             else:
                 # Relative path - prepend SPLUNK_HOME
                 resolved_path = str(self.splunk_home / path)
@@ -1389,30 +1825,39 @@ class CertificateVerifier:
         self.get_splunk_version()
 
         # Run configuration checks using SplunkConfigChecker
-        print(f"\n{Colors.BOLD}1. Running configuration checks{Colors.ENDC}")
         config_rules_path = (
-            Path(__file__).parent.parent / "splunk_config_checker" / "config_rules.json"
+            Path(__file__).parent.parent / "splunk_config_checker" / "rules" / "kvstore.json"
         )
         config_checker = SplunkConfigChecker(self.splunk_home, config_rules_path)
         check_results = config_checker.check_configurations()
         config_checker.print_results(check_results)
+        for r in check_results:
+            if not r.passed:
+                level = r.rule.level.value
+                if level == "ERROR":
+                    self.errors.append(r.message)
+                else:
+                    self.warnings.append(r.message)
         config = self.parse_server_conf()
 
         # Verify sslConfig section
-        print(f"\n{Colors.BOLD}2. Verifying [sslConfig] section{Colors.ENDC}")
         ssl_config_results = self.verify_ssl_config_section(config, "sslConfig")
 
         # Verify kvstore section
-        print(f"\n{Colors.BOLD}3. Verifying [kvstore] section{Colors.ENDC}")
         kvstore_results = self.verify_kvstore_section(config)
 
         # Check CA completeness
-        print(f"\n{Colors.BOLD}4. Verifying CA certificate completeness{Colors.ENDC}")
         ca_complete = self.check_ca_completeness(config)
 
         # Check version compatibility
-        print(f"\n{Colors.BOLD}5. Checking version compatibility{Colors.ENDC}")
         version_compatible = self.check_version_compatibility()
+
+        # Check KVStore disk space
+        disk_space_ok = self.check_kvstore_disk_space(config)
+
+        # Check live KVStore and SHC status
+        kvstore_status = self.check_kvstore_status()
+        shcluster_status = self.check_shcluster_status()
 
         # Compile results
         results = {
@@ -1420,6 +1865,9 @@ class CertificateVerifier:
             "kvstore": kvstore_results,
             "ca_complete": ca_complete,
             "version_compatible": version_compatible,
+            "disk_space_ok": disk_space_ok,
+            "kvstore_status": kvstore_status,
+            "shcluster_status": shcluster_status,
             "errors": self.errors,
             "warnings": self.warnings,
             "info": self.info,
@@ -1433,159 +1881,75 @@ class CertificateVerifier:
     def print_summary(self, results: Dict):
         """Print verification summary"""
         print(f"\n{Colors.BOLD}VERIFICATION SUMMARY{Colors.ENDC}")
-        print("=" * 120)  # Wider separator for more detailed output
+        print("=" * 60)
 
-        total_checks = 0
-        passed_checks = 0
+        errors = results.get("errors", [])
+        warnings = results.get("warnings", [])
 
-        # SSL Config checks
-        ssl_config = results.get("ssl_config", {})
-        ssl_checks = [
-            (
-                "server.conf [sslConfig] section exists",
-                ssl_config.get("section_exists"),
-                "Configuration section must exist",
-            ),
-            (
-                "server.conf [sslConfig] allowSslCompression=true",
-                ssl_config.get("ssl_compression_ok"),
-                "Required for optimal performance",
-            ),
-            (
-                "server.conf [sslConfig] allowSslRenegotiation=true",
-                ssl_config.get("ssl_renegotiation_ok"),
-                "Required for SSL connectivity",
-            ),
-            (
-                "server.conf [sslConfig] serverCert is valid",
-                ssl_config.get("server_cert_valid"),
-                "Certificate file must be readable and valid",
-            ),
-            (
-                "server.conf [sslConfig] certificate chain is valid",
-                ssl_config.get("cert_chain_valid"),
-                "Certificate must be properly signed by CA",
-            ),
-        ]
+        # --- Status Checks block ---
+        kvstore_status = results.get("kvstore_status", {})
+        shcluster_status = results.get("shcluster_status", {})
+        disk_space_ok = results.get("disk_space_ok")
 
-        # KV Store checks
-        kvstore = results.get("kvstore", {})
-        kvstore_checks = [
-            (
-                "server.conf [kvstore] section exists",
-                kvstore.get("section_exists"),
-                "Configuration section should exist for custom settings",
-            ),
-            (
-                "server.conf [kvstore] serverCert is valid",
-                kvstore.get("server_cert_valid"),
-                "Certificate file must be readable and valid",
-            ),
-            (
-                "server.conf [kvstore] certificate has correct purpose",
-                kvstore.get("server_cert_purpose_ok"),
-                "Certificate must allow both server and client authentication",
-            ),
-            (
-                "server.conf [kvstore] certificate SAN is correct",
-                kvstore.get("server_cert_san_ok"),
-                "SAN must include localhost/127.0.0.1 unless verifyServerName=false",
-            ),
-            (
-                "server.conf [kvstore] CA certificate has correct purpose",
-                kvstore.get("ca_cert_purpose_ok"),
-                "CA certificate must be valid for signing",
-            ),
-            (
-                "server.conf [kvstore] certificate chain is valid",
-                kvstore.get("cert_chain_valid"),
-                "Certificate must be properly signed by CA",
-            ),
-            (
-                "server.conf [kvstore] verifyServerName=false",
-                kvstore.get("verify_server_name_disabled"),
-                "Recommended setting for KV Store compatibility",
-            ),
-        ]
+        print(f"\n{Colors.BOLD}Status Checks:{Colors.ENDC}")
 
-        # Compression settings
-        compression_checks = [
-            (
-                "outputs.conf [tcpout] compressed=true",
-                results.get("outputs_compression", {}).get("compressed"),
-                "Recommended for optimal data transmission",
-            ),
-            (
-                "outputs.conf [tcpout] useClientSSLCompression=true",
-                results.get("outputs_compression", {}).get("ssl_compression"),
-                "Recommended for encrypted data transmission",
-            ),
-        ]
-
-        def print_check_section(title: str, checks: List[Tuple]):
-            nonlocal total_checks, passed_checks
-            print(f"\n{Colors.BOLD}{title}:{Colors.ENDC}")
-            print("-" * 118)  # Separator for subsections
-            print(f"{'Status':<8} {'Check':<60} {'Details':<50}")
-            print("-" * 118)
-
-            for check_name, check_result, check_details in checks:
-                total_checks += 1
-                if check_result:
-                    passed_checks += 1
-                    status = f"{Colors.GREEN}✓{Colors.ENDC}"
-                else:
-                    status = f"{Colors.RED}✗{Colors.ENDC}"
-                print(f"{status:<8} {check_name:<60} {check_details:<50}")
-
-        # Print all sections
-        print_check_section("SSL Configuration", ssl_checks)
-        print_check_section("KV Store Configuration", kvstore_checks)
-        print_check_section("Compression Settings", compression_checks)
-
-        # Additional checks
-        other_checks = [
-            (
-                "CA certificates structure complete",
-                results.get("ca_complete", False),
-                "All required CA certificates are present and valid",
-            ),
-            (
-                "Version compatibility verified",
-                True,
-                f"Current version: {self.splunk_version or 'Unknown'}",
-            ),
-        ]
-        print_check_section("Other Checks", other_checks)
-
-        # Print overall status
-        print("\n" + "=" * 120)
-        if passed_checks == total_checks:
+        if disk_space_ok is True:
             print(
-                f"{Colors.GREEN}All checks passed ({passed_checks}/{total_checks}){Colors.ENDC}"
+                f"  {Colors.GREEN}\u2713 KVStore disk space: sufficient (\u226550% free){Colors.ENDC}"
+            )
+        elif disk_space_ok is False:
+            print(
+                f"  {Colors.RED}\u2717 KVStore disk space: insufficient (<50% free){Colors.ENDC}"
             )
         else:
             print(
-                f"{Colors.RED}Some checks failed ({passed_checks}/{total_checks} passed){Colors.ENDC}"
+                f"  {Colors.YELLOW}? KVStore disk space: could not be determined{Colors.ENDC}"
             )
 
-        if self.errors:
-            print(f"\n{Colors.RED}Errors found:{Colors.ENDC}")
-            for error in self.errors:
+        if kvstore_status.get("ran"):
+            if kvstore_status.get("ready"):
+                print(f"  {Colors.GREEN}\u2713 KVStore status: ready{Colors.ENDC}")
+            else:
+                print(
+                    f"  {Colors.YELLOW}? KVStore status: not ready or could not determine{Colors.ENDC}"
+                )
+        else:
+            print(
+                f"  {Colors.YELLOW}? KVStore status: check not run (splunkd may not be running){Colors.ENDC}"
+            )
+
+        if shcluster_status.get("ran"):
+            if not shcluster_status.get("applicable"):
+                print(
+                    f"  {Colors.BLUE}  SHC status: not applicable (not a cluster member){Colors.ENDC}"
+                )
+            elif shcluster_status.get("healthy"):
+                print(f"  {Colors.GREEN}\u2713 SHC status: healthy{Colors.ENDC}")
+            else:
+                print(f"  {Colors.RED}\u2717 SHC status: unhealthy or degraded{Colors.ENDC}")
+        else:
+            print(
+                f"  {Colors.YELLOW}? SHC status: check not run (splunkd may not be running){Colors.ENDC}"
+            )
+
+        if errors:
+            print(f"\n{Colors.RED}Errors:{Colors.ENDC}")
+            for error in errors:
                 print(f"  - {error}")
 
-        if self.warnings:
-            print(f"\n{Colors.YELLOW}Warnings found:{Colors.ENDC}")
-            for warning in self.warnings:
+        if warnings:
+            print(f"\n{Colors.YELLOW}Warnings:{Colors.ENDC}")
+            for warning in warnings:
                 print(f"  - {warning}")
 
-        if passed_checks == total_checks and not self.errors:
+        print("\n" + "=" * 60)
+        if not errors:
             print(
-                f"\n{Colors.GREEN}{Colors.BOLD}✓ All checks passed! KV Store configuration appears ready for upgrade.{Colors.ENDC}"
+                f"\n{Colors.GREEN}{Colors.BOLD}\u2713 All checks passed! KV Store configuration appears ready for upgrade.{Colors.ENDC}"
             )
         else:
             print(
-                f"\n{Colors.RED}{Colors.BOLD}✗ Some checks failed. Please review and fix issues before upgrading.{Colors.ENDC}"
+                f"\n{Colors.RED}{Colors.BOLD}\u2717 Some checks failed. Please review and fix issues before upgrading.{Colors.ENDC}"
             )
 
 
@@ -1653,7 +2017,7 @@ to ensure compatibility with Splunk's environment and libraries.
     )
 
     parser.add_argument(
-        "splunk_home", help="Path to Splunk installation directory (SPLUNK_HOME)"
+        "splunk_home", help="Path to Splunk installation directory (SPLUNK_HOME)", default="/opt/splunk"
     )
 
     parser.add_argument(

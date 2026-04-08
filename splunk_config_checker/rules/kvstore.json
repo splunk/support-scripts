@@ -1,0 +1,44 @@
+{
+    "rules": [
+        {
+            "filename": "server",
+            "stanza": "sslConfig",
+            "setting": "compressed",
+            "expected_value": true,
+            "level": "ERROR",
+            "message": "server.conf [sslConfig] compressed = true should be set"
+        },
+        {
+            "filename": "server",
+            "stanza": "sslConfig",
+            "setting": "useClientSSLCompression",
+            "expected_value": false,
+            "level": "ERROR",
+            "message": "server.conf [sslConfig] useClientSSLCompression = false should be set"
+        },
+        {
+            "filename": "server",
+            "stanza": "sslConfig",
+            "setting": "allowSslCompression",
+            "expected_value": true,
+            "level": "ERROR",
+            "message": "server.conf [sslConfig] allowSslCompression = true should be set"
+        },
+        {
+            "filename": "server",
+            "stanza": "sslConfig",
+            "setting": "SplunkdClientSSLCompression",
+            "expected_value": true,
+            "level": "ERROR",
+            "message": "server.conf [sslConfig] SplunkdClientSSLCompression = true should be set"
+        },
+        {
+            "filename": "server",
+            "stanza": "sslConfig",
+            "setting": "useSplunkdClientSSLCompression",
+            "expected_value": true,
+            "level": "ERROR",
+            "message": "server:sslConfig:useSplunkdClientSSLCompression should be enabled"
+        }
+    ]
+}

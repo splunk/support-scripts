@@ -6,6 +6,10 @@ This tool verifies KV Store certificate configurations for safe upgrades from Sp
 
 - **Comprehensive Certificate Analysis**: Validates certificate formats, purposes, and chain verification
 - **Configuration Validation**: Checks `server.conf` settings for both `[sslConfig]` and `[kvstore]` sections
+- **Certificate Expiry Checks**: Validates that both server and CA certificates have not expired
+- **Certificate Purpose Validation**: Checks SSL server and SSL client purpose flags on the full cert chain via OpenSSL or the `cryptography` library
+- **Disk Space Check**: Verifies at least 50% free disk space is available on the KVStore data filesystem
+- **Live Status Checks**: Runs `splunk show kvstore-status --verbose` and `splunk show shcluster-status` to confirm runtime health
 - **Version Compatibility**: Ensures certificate requirements match Splunk version capabilities
 - **Multiple Output Formats**: Supports both human-readable and JSON output
 - **Dual Implementation**: Python script for comprehensive checks, Bash script for basic validation
@@ -20,8 +24,23 @@ This tool verifies KV Store certificate configurations for safe upgrades from Sp
 ### Certificate Purpose Requirements
 
 - **sslConfig certificates**: Must be signed by given/presented CA
-- **kvstore certificates**: Must have no purpose OR be dual purpose (client + server)
-- **CA certificates**: Must have no purpose OR be dual purpose (client + server)
+- **kvstore certificates**: Must have no purpose OR be dual purpose (client + server auth)
+- **CA certificates**: Must have no purpose OR be dual purpose (client + server auth)
+- **OpenSSL fallback**: When the `cryptography` library is unavailable, purpose is checked via `openssl x509 -noout -purpose`
+
+### Certificate Expiry Requirements
+
+- **server.pem**: Must not be expired; expiry date and days remaining are reported
+- **cacert.pem**: Must not be expired; expiry date and days remaining are reported
+
+### server.conf [sslConfig] Settings Required
+
+| Setting | Required Value |
+|---------|----------------|
+| `allowSslCompression` | `true` |
+| `SplunkdClientSSLCompression` | `true` |
+| `useSplunkdClientSSLCompression` | `true` |
+| `useClientSSLCompression` | `false` |
 
 ### Network Requirements
 
@@ -33,6 +52,16 @@ This tool verifies KV Store certificate configurations for safe upgrades from Sp
 - **SSL Compression**: `allowSslCompression=true` required in `[sslConfig]`
 - **SSL Renegotiation**: `allowSslRenegotiation=true` required in `[sslConfig]`
 - **CA Completeness**: `sslRootCAPath` must contain ALL CAs used in KV Store cluster
+
+### Disk Space Requirements
+
+- At least **50% free disk space** must be available on the filesystem that hosts the KVStore data directory (`[kvstore] dbPath`, defaulting to `$SPLUNK_DB/kvstore`)
+- `SPLUNK_DB` is resolved from `$SPLUNK_HOME/etc/splunk-launch.conf`, falling back to `$SPLUNK_HOME/var/lib/splunk`
+
+### Live Status Checks
+
+- **KVStore status**: `splunk show kvstore-status --verbose` — confirms `status: ready` and `storageEngine: wiredTiger`
+- **SHC status**: `splunk show shcluster-status` — confirms all members are `Up` and a captain is elected (skipped gracefully if node is not a cluster member or splunkd is not running)
 
 ### Version-Specific Requirements
 
@@ -166,15 +195,19 @@ If `btool` is unavailable, falls back to manual parsing of default and local fil
 #### [sslConfig] Section
 
 - `allowSslCompression` - Must be `true`
+- `SplunkdClientSSLCompression` - Must be `true`
+- `useSplunkdClientSSLCompression` - Must be `true`
+- `useClientSSLCompression` - Must be `false`
 - `allowSslRenegotiation` - Must be `true`
-- `serverCert` - Server certificate path
-- `caCertFile` or `sslRootCAPath` - CA certificate path
+- `serverCert` - Server certificate path (validated for expiry, purpose, and chain)
+- `caCertFile` or `sslRootCAPath` - CA certificate path (validated for expiry and purpose)
 
 #### [kvstore] Section
 
-- `serverCert` - KV Store server certificate
+- `serverCert` - KV Store server certificate (optional; defaults to `[sslConfig]` cert if absent)
 - `caCertFile` or `sslRootCAPath` - KV Store CA certificate
 - `verifyServerName` - Hostname verification setting
+- `dbPath` - KVStore data directory (used for disk space check)
 
 ## Certificate Analysis
 
@@ -188,12 +221,13 @@ If `btool` is unavailable, falls back to manual parsing of default and local fil
 ### Purpose Validation
 
 - **Key Usage**: Analyzes X.509 Key Usage extension
-- **Extended Key Usage**: Checks for Server Auth and Client Auth purposes
+- **Extended Key Usage**: Checks for Server Auth (`SSL server`) and Client Auth (`SSL client`) purposes
 - **No Purpose**: Validates certificates without purpose restrictions
+- **OpenSSL fallback**: Uses `openssl x509 -noout -purpose` when the `cryptography` library is unavailable; parses `SSL server` and `SSL client` lines from the output
 
 ### Chain Validation
 
-- **Signature Verification**: Confirms certificates signed by specified CA
+- **Signature Verification**: Confirms certificates signed by specified CA using `openssl verify -verbose -CAfile cacert.pem server.pem`
 - **Issuer Matching**: Validates certificate issuer against CA subject
 - **Trust Chain**: Ensures complete certificate chain validation
 
@@ -237,7 +271,42 @@ _Solution_: Add required SSL settings to server.conf:
 [sslConfig]
 allowSslCompression = true
 allowSslRenegotiation = true
+SplunkdClientSSLCompression = true
+useSplunkdClientSSLCompression = true
+useClientSSLCompression = false
 ```
+
+**5. Certificate Expired**
+
+```
+ERROR: Certificate has EXPIRED on 2025-01-15
+```
+
+_Solution_: Renew the expired certificate and update the paths in `server.conf`.
+
+**6. Insufficient Disk Space**
+
+```
+ERROR: Insufficient disk space for KVStore: only 38.2% free ...
+```
+
+_Solution_: Free disk space on the KVStore data volume. At least 50% free space is required before upgrading KV Store.
+
+**7. KVStore Not Ready**
+
+```
+ERROR: KVStore is not in ready state: status=degraded
+```
+
+_Solution_: Resolve any KVStore health issues (check `splunk show kvstore-status --verbose` for details) before upgrading.
+
+**8. SPLUNK_DB Path Unresolvable**
+
+```
+WARN: Cannot check disk space: KVStore path not reachable: $SPLUNK_DB/kvstore
+```
+
+_Solution_: Ensure `splunk-launch.conf` contains a valid `SPLUNK_DB=` entry, or set the `SPLUNK_DB` environment variable before running the tool.
 
 ### Version-Specific Issues
 
