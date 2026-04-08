@@ -38,6 +38,8 @@ This tool verifies KV Store certificate configurations for safe upgrades from Sp
 | Setting | Required Value |
 |---------|----------------|
 | `allowSslCompression` | `true` |
+| `allowSslRenegotiation` | `true` |
+| `compressed` | `true` |
 | `SplunkdClientSSLCompression` | `true` |
 | `useSplunkdClientSSLCompression` | `true` |
 | `useClientSSLCompression` | `false` |
@@ -45,12 +47,11 @@ This tool verifies KV Store certificate configurations for safe upgrades from Sp
 ### Network Requirements
 
 - **SAN validation**: KV Store certificates must contain 127.0.0.1 or localhost, unless `verifyServerName=false`
-- **Hostname validation**: Can be disabled via `verifyServerName=false` setting
+- **Hostname validation**: Can be disabled via `verifyServerName=false` setting.
+- **sslVerifyServerName**: When a custom (non-default) certificate is detected in `[sslConfig]`, `sslVerifyServerName = true` must be set in that stanza, or the KV Store upgrade can fail.
 
 ### Configuration Requirements
 
-- **SSL Compression**: `allowSslCompression=true` required in `[sslConfig]`
-- **SSL Renegotiation**: `allowSslRenegotiation=true` required in `[sslConfig]`
 - **CA Completeness**: `sslRootCAPath` must contain ALL CAs used in KV Store cluster
 
 ### Disk Space Requirements
@@ -101,18 +102,20 @@ The `splunk_config_checker` package is a required internal dependency that must 
 
 ### Python Script (Comprehensive)
 
+> **Important**: Run using Splunk's bundled Python interpreter to ensure full compatibility with Splunk's libraries and environment.
+
 ```bash
-# Basic usage
-python3 kv_cert_verifier.py /opt/splunk
+# Recommended: use Splunk's bundled Python
+$SPLUNK_HOME/bin/python kv_cert_verifier.py $SPLUNK_HOME
 
 # Verbose output
-python3 kv_cert_verifier.py /opt/splunk --verbose
+$SPLUNK_HOME/bin/python kv_cert_verifier.py $SPLUNK_HOME --verbose
 
 # JSON output
-python3 kv_cert_verifier.py /opt/splunk --output json
+$SPLUNK_HOME/bin/python kv_cert_verifier.py $SPLUNK_HOME --output json
 
-# Using environment variable
-python3 kv_cert_verifier.py $SPLUNK_HOME -v
+# Explicit path example
+/opt/splunk/bin/python kv_cert_verifier.py /opt/splunk -v
 ```
 
 ### Bash Script (Basic Checks)
@@ -130,23 +133,30 @@ python3 kv_cert_verifier.py $SPLUNK_HOME -v
 
 ## Output
 
+During execution the tool prints `[INFO]`, `[WARN]`, and `[ERROR]` prefixed messages as each check runs, followed by a `VERIFICATION SUMMARY` block.
+
 ### Success Example
 
 ```
-✓ SSL Config section exists
-✓ SSL compression enabled
-✓ SSL renegotiation enabled
-✓ SSL server certificate valid
-✓ SSL certificate chain valid
-✓ KV Store server cert valid
-✓ KV Store cert purpose correct
-✓ KV Store cert SAN correct
-✓ KV Store CA cert purpose correct
-✓ KV Store certificate chain valid
-✓ CA certificates complete
-✓ Version compatibility
+Splunk KV Store Certificate Verification Tool
+Splunk Home: /opt/splunk
+============================================================
+[INFO] Detected Splunk version: 9.4.3
+[INFO] Running btool command: /opt/splunk/bin/splunk btool server list
+[INFO] Successfully retrieved effective server.conf using btool
+[INFO] server.pem is signed by SplunkCommonCA (default cert); sslVerifyServerName is not required
+[INFO] Certificate is valid (expires 2027-04-01, 357 days remaining)
+...
 
-Checks passed: 12/12
+VERIFICATION SUMMARY
+============================================================
+
+Status Checks:
+  ✓ KVStore disk space: sufficient (≥50% free)
+  ✓ KVStore status: ready
+    SHC status: not applicable (not a cluster member)
+
+============================================================
 
 ✓ All checks passed! KV Store configuration appears ready for upgrade.
 ```
@@ -154,18 +164,29 @@ Checks passed: 12/12
 ### Error Example
 
 ```
-✗ SSL Config section exists
-✓ SSL compression enabled
-✗ SSL renegotiation enabled
-✗ SSL server certificate valid
-✗ SSL certificate chain valid
+Splunk KV Store Certificate Verification Tool
+Splunk Home: /opt/splunk
+============================================================
+[INFO] Detected Splunk version: 9.2.1
+[ERROR] allowSslRenegotiation must be set to true in [sslConfig] (current: false)
+[ERROR] Certificate file not found: /opt/splunk/etc/auth/server.pem
+[ERROR] Server certificate chain verification failed for [sslConfig]
+...
 
-Checks passed: 1/12
+VERIFICATION SUMMARY
+============================================================
 
-ERRORS (3):
-  • allowSslRenegotiation must be set to true in [sslConfig] (current: false)
-  • Server certificate file not found: /opt/splunk/etc/auth/server.pem
-  • Server certificate chain verification failed for [sslConfig]
+Status Checks:
+  ✓ KVStore disk space: sufficient (≥50% free)
+  ? KVStore status: check not run (splunkd may not be running)
+    SHC status: not applicable (not a cluster member)
+
+Errors:
+  - allowSslRenegotiation must be set to true in [sslConfig] (current: false)
+  - Certificate file not found: /opt/splunk/etc/auth/server.pem
+  - Server certificate chain verification failed for [sslConfig]
+
+============================================================
 
 ✗ Some checks failed. Please review and fix issues before upgrading.
 ```
@@ -199,6 +220,7 @@ If `btool` is unavailable, falls back to manual parsing of default and local fil
 - `useSplunkdClientSSLCompression` - Must be `true`
 - `useClientSSLCompression` - Must be `false`
 - `allowSslRenegotiation` - Must be `true`
+- `compressed` - Must be `true`
 - `serverCert` - Server certificate path (validated for expiry, purpose, and chain)
 - `caCertFile` or `sslRootCAPath` - CA certificate path (validated for expiry and purpose)
 
