@@ -38,6 +38,8 @@ This tool verifies KV Store certificate configurations for safe upgrades from Sp
 | Setting | Required Value |
 |---------|----------------|
 | `allowSslCompression` | `true` |
+| `allowSslRenegotiation` | `true` |
+| `compressed` | `true` |
 | `SplunkdClientSSLCompression` | `true` |
 | `useSplunkdClientSSLCompression` | `true` |
 | `useClientSSLCompression` | `false` |
@@ -133,20 +135,37 @@ python3 kv_cert_verifier.py $SPLUNK_HOME -v
 ### Success Example
 
 ```
-✓ SSL Config section exists
-✓ SSL compression enabled
-✓ SSL renegotiation enabled
-✓ SSL server certificate valid
+Splunk KV Store Certificate Verification Tool
+Splunk Home: /opt/splunk
+============================================================
+[INFO] server.conf [sslConfig] compressed = true should be set                    PASS
+[INFO] server.conf [sslConfig] useClientSSLCompression = false should be set      PASS
+[INFO] server.conf [sslConfig] allowSslCompression = true should be set           PASS
+[INFO] server.conf [sslConfig] SplunkdClientSSLCompression = true should be set   PASS
+[INFO] server:sslConfig:useSplunkdClientSSLCompression should be enabled          PASS
+[INFO] server.conf [sslConfig] allowSslRenegotiation = true should be set         PASS
+✓ allowSslCompression is set to true in [sslConfig]
+✓ allowSslRenegotiation is set to true in [sslConfig]
+✓ Server certificate loaded successfully
+✓ Certificate not expired (364 days remaining)
 ✓ SSL certificate chain valid
-✓ KV Store server cert valid
-✓ KV Store cert purpose correct
-✓ KV Store cert SAN correct
-✓ KV Store CA cert purpose correct
+✓ KV Store server certificate loaded successfully
+✓ KV Store cert purpose correct (no purpose or dual purpose)
+✓ KV Store cert SAN requirements satisfied
+✓ KV Store CA certificate purpose correct
 ✓ KV Store certificate chain valid
 ✓ CA certificates complete
-✓ Version compatibility
+✓ Version compatibility confirmed
 
-Checks passed: 12/12
+VERIFICATION SUMMARY
+============================================================
+
+Status Checks:
+  ✓ KVStore disk space: sufficient (≥50% free)
+  ✓ KVStore status: ready
+    SHC status: not applicable (not a cluster member)
+
+============================================================
 
 ✓ All checks passed! KV Store configuration appears ready for upgrade.
 ```
@@ -154,18 +173,34 @@ Checks passed: 12/12
 ### Error Example
 
 ```
-✗ SSL Config section exists
-✓ SSL compression enabled
-✗ SSL renegotiation enabled
-✗ SSL server certificate valid
-✗ SSL certificate chain valid
+Splunk KV Store Certificate Verification Tool
+Splunk Home: /opt/splunk
+============================================================
+[INFO] server.conf [sslConfig] compressed = true should be set                    PASS
+[INFO] server.conf [sslConfig] useClientSSLCompression = false should be set      PASS
+[INFO] server.conf [sslConfig] allowSslCompression = true should be set           PASS
+[INFO] server.conf [sslConfig] SplunkdClientSSLCompression = true should be set   PASS
+[INFO] server:sslConfig:useSplunkdClientSSLCompression should be enabled          PASS
+[ERROR] server.conf [sslConfig] allowSslRenegotiation = true should be set        FAIL
+✓ allowSslCompression is set to true in [sslConfig]
+✗ allowSslRenegotiation must be set to true in [sslConfig] (current: false)
+✗ Server certificate file not found: /opt/splunk/etc/auth/server.pem
+✗ Server certificate chain verification failed for [sslConfig]
 
-Checks passed: 1/12
+VERIFICATION SUMMARY
+============================================================
 
-ERRORS (3):
-  • allowSslRenegotiation must be set to true in [sslConfig] (current: false)
-  • Server certificate file not found: /opt/splunk/etc/auth/server.pem
-  • Server certificate chain verification failed for [sslConfig]
+Status Checks:
+  ✓ KVStore disk space: sufficient (≥50% free)
+  ? KVStore status: check not run (splunkd may not be running)
+  ? SHC status: check not run (splunkd may not be running)
+
+Errors:
+  - allowSslRenegotiation must be set to true in [sslConfig] (current: false)
+  - Server certificate file not found: /opt/splunk/etc/auth/server.pem
+  - Server certificate chain verification failed for [sslConfig]
+
+============================================================
 
 ✗ Some checks failed. Please review and fix issues before upgrading.
 ```

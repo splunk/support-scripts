@@ -24,6 +24,7 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Submitting Scripts](#submitting-scripts)
   - [Authors](#authors)
   - [Changelog](#changelog)
+    - [v1.6.1 - 2026-04-09](#v161---2026-04-09)
     - [v1.6.0 - 2026-04-08](#v160---2026-04-08)
     - [v1.5.0 - 2026-04-01](#v150---2026-04-01)
     - [v1.4.0 - 2026-02-18](#v140---2026-02-18)
@@ -244,6 +245,13 @@ Send scripts to the repository maintainer for review. Include:
 - Rob Hilgefort (rhilgefort@splunk.com) - Repository setup, review, and stewardship
 
 ## Changelog
+
+### v1.6.1 - 2026-04-09
+
+**Updated:**
+
+- `kvcertverify` - Updated README example outputs to reflect current tool output format
+- `splunk_config_checker` - Added `allowSslRenegotiation` rule to KV Store pre-flight rule set (`rules/kvstore.json`)
 
 ### v1.6.0 - 2026-04-08
 
