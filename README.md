@@ -14,6 +14,7 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Data Privacy](#data-privacy)
     - [Cluster \& Network Diagnostics](#cluster--network-diagnostics)
     - [Storage \& Volume Management](#storage--volume-management)
+      - [Bucket Manifest Cleaner](#bucket-manifest-cleaner)
     - [Performance \& Diagnostics](#performance--diagnostics)
     - [Testing \& Validation](#testing--validation)
   - [General Requirements](#general-requirements)
@@ -112,6 +113,11 @@ Requires Splunk Enterprise access. See individual tool READMEs for detailed usag
 
 - **Problem**: Need visibility into how Splunk indexes map to underlying storage volumes across hot, cold, and frozen tiers
 - **Solution**: Uses btool and findmnt to show each index's storage mount point and filesystem type
+
+**[Bucket Manifest Cleaner](bucket-manifests/README.md)** - Identify and remove stale `.bucketmanifest` files blocking bucket freeze
+
+- **Problem**: Buckets log `freeze skipped for bid=` in `splunkd.log` and fail to archive due to stale manifest files
+- **Solution**: Parses `splunkd.log*` to extract affected bucket IDs, then resolves and removes the corresponding `.bucketmanifest` files
 
 ### Performance & Diagnostics
 
@@ -245,6 +251,12 @@ Send scripts to the repository maintainer for review. Include:
 - Rob Hilgefort (rhilgefort@splunk.com) - Repository setup, review, and stewardship
 
 ## Changelog
+
+### v1.7.0 - 2026-04-09
+
+**Added:**
+
+- `bucket-manifests` - Two-script toolkit to find and remove stale `.bucketmanifest` files that prevent bucket freeze. `find_bucket_manifests.py` parses `splunkd.log*` for skipped-freeze bucket IDs; `remove_bucket_manifests.py` resolves and removes the manifest files with dry-run support
 
 ### v1.6.1 - 2026-04-09
 
