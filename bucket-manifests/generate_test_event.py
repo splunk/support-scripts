@@ -29,9 +29,7 @@ import sys
 import json
 import uuid
 import argparse
-import ssl
-import urllib.request
-import urllib.error
+import subprocess
 from datetime import datetime
 
 
@@ -93,7 +91,7 @@ def build_event(bid: str) -> dict:
         "host":       "test-splunk-host",
         "source":     "splunkd.log",
         "sourcetype": "splunkd",
-        "index":      "_splunkd",
+        "index":      "main",
         "event":      raw,
     }
 
@@ -103,31 +101,28 @@ def build_event(bid: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def send_event(payload: dict, url: str, token: str, verify_ssl: bool) -> None:
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={
-            "Authorization": f"Splunk {token}",
-            "Content-Type":  "application/json",
-        },
-        method="POST",
-    )
-
-    ctx = ssl.create_default_context()
+    data = json.dumps(payload)
+    cmd = [
+        "curl", "-s",
+        "-X", "POST", url,
+        "-H", f"Authorization: Splunk {token}",
+        "-H", "Content-Type: application/json",
+        "-d", data,
+    ]
     if not verify_ssl:
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        cmd.append("-k")
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    if result.returncode != 0:
+        raise RuntimeError(f"curl failed: {result.stderr.strip()}")
 
     try:
-        with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
-            body = resp.read().decode("utf-8")
-            result = json.loads(body)
-            if result.get("text") != "Success":
-                raise RuntimeError(f"HEC returned non-success: {body}")
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {exc.code}: {body}") from exc
+        body = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        raise RuntimeError(f"Unexpected HEC response: {result.stdout.strip()}")
+
+    if body.get("text") != "Success":
+        raise RuntimeError(f"HEC returned non-success: {result.stdout.strip()}")
 
 
 # ---------------------------------------------------------------------------
@@ -141,11 +136,16 @@ def main() -> None:
             "for use with find_bucket_manifests.py testing."
         )
     )
-    parser.add_argument(
+    token_group = parser.add_mutually_exclusive_group(required=True)
+    token_group.add_argument(
         "--token",
-        required=True,
         metavar="TOKEN",
-        help="HEC token.",
+        help="HEC token (literal value).",
+    )
+    token_group.add_argument(
+        "--token-file",
+        metavar="FILE",
+        help="Path to a file containing the HEC token (first line used).",
     )
     parser.add_argument(
         "--bid",
@@ -184,6 +184,19 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.token_file:
+        try:
+            with open(args.token_file) as fh:
+                token = fh.readline().strip()
+            if not token:
+                log_error(f"Token file is empty: {args.token_file}")
+                sys.exit(1)
+        except OSError as exc:
+            log_error(f"Cannot read token file: {exc}")
+            sys.exit(1)
+    else:
+        token = args.token
+
     bid = args.bid or make_bid()
     url = f"https://{args.splunk_host}:{args.hec_port}/services/collector/event"
 
@@ -198,7 +211,7 @@ def main() -> None:
     for i in range(1, args.count + 1):
         payload = build_event(bid)
         try:
-            send_event(payload, url, args.token, verify_ssl=not args.no_ssl_verify)
+            send_event(payload, url, token, verify_ssl=not args.no_ssl_verify)
             log_success(f"Sent event {i}/{args.count}: {payload['event']}")
         except RuntimeError as exc:
             log_error(f"Event {i}/{args.count} failed: {exc}")
