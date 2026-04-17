@@ -4,12 +4,12 @@ Splunk Bucket Manifest Cleaner
 
 Reads a CSV file containing a list of bucket IDs (bid) in the format
 <index>~<seqno>~<peer_guid>, resolves each bucket's directory on disk,
-and removes the .bucketManifest file from that directory.
+and moves the .bucketManifest file to a backup directory.
 
 Usage:
-    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv
-    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --dry-run
-    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --splunk-home /opt/splunk
+    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifests
+    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifests --dry-run
+    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifests --splunk-home /opt/splunk
 
 CSV format (single column, header required):
     bid
@@ -24,6 +24,7 @@ import csv
 import argparse
 import glob
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -203,10 +204,10 @@ def find_bucket_dir(splunk_db: Path, index_name: str, seqno: str, guid: str) -> 
 # Main logic
 # ---------------------------------------------------------------------------
 
-def process_buckets(bids: list, splunk_db: Path, dry_run: bool) -> dict:
+def process_buckets(bids: list, splunk_db: Path, backup_dir: Path, dry_run: bool) -> dict:
     """
     Iterate over parsed bid entries, resolve the bucket directory, and
-    remove (or report) the .bucketManifest file.
+    move (or report) the .bucketManifest file to backup_dir.
 
     Returns a summary dict.
     """
@@ -259,22 +260,25 @@ def process_buckets(bids: list, splunk_db: Path, dry_run: bool) -> dict:
             continue
 
         if dry_run:
-            log_dryrun(f"Would remove: {manifest}")
+            log_dryrun(f"Would move: {manifest} -> {backup_dir}/")
             summary["removed"] += 1
         else:
             try:
-                os.remove(manifest)
-                log_success(f"Removed: {manifest}")
+                # Preserve uniqueness: prefix with bucket dir name to avoid
+                # collisions when multiple indices have seqno 0, etc.
+                dest = backup_dir / f"{bucket_dir.name}_{manifest.name}"
+                shutil.move(str(manifest), str(dest))
+                log_success(f"Moved: {manifest} -> {dest}")
                 summary["removed"] += 1
             except OSError as exc:
-                log_error(f"Line {lineno}: failed to remove {manifest} — {exc}")
+                log_error(f"Line {lineno}: failed to move {manifest} — {exc}")
                 summary["errors"] += 1
 
     return summary
 
 
 def print_summary(summary: dict, dry_run: bool) -> None:
-    label = "Would remove" if dry_run else "Removed"
+    label = "Would move" if dry_run else "Moved"
     print()
     print(f"{Colors.BOLD}{'=' * 50}{Colors.ENDC}")
     print(f"{Colors.BOLD}Summary{Colors.ENDC}")
@@ -296,8 +300,8 @@ def print_summary(summary: dict, dry_run: bool) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Remove .bucketManifest files for a list of Splunk bucket IDs. "
-            "Bucket IDs must follow the format <index>~<seqno>~<peer_guid>."
+            "Move .bucketManifest files for a list of Splunk bucket IDs to a backup directory. "
+            "Bucket IDs must follow the format <index>~<seqno> or <index>~<seqno>~<peer_guid>."
         )
     )
     parser.add_argument(
@@ -305,6 +309,12 @@ def main() -> None:
         required=True,
         metavar="FILE",
         help="Path to CSV file with a 'bid' column.",
+    )
+    parser.add_argument(
+        "--backup-dir",
+        required=True,
+        metavar="PATH",
+        help="Directory to move .bucketManifest files into (created if it does not exist).",
     )
     parser.add_argument(
         "--splunk-home",
@@ -315,12 +325,13 @@ def main() -> None:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print what would be removed without deleting anything.",
+        help="Print what would be moved without touching anything.",
     )
     args = parser.parse_args()
 
     splunk_home = Path(args.splunk_home)
     csv_path    = Path(args.csv)
+    backup_dir  = Path(args.backup_dir)
 
     # --- validate inputs ---
     if not splunk_home.is_dir():
@@ -331,10 +342,18 @@ def main() -> None:
         log_error(f"CSV file not found: {csv_path}")
         sys.exit(1)
 
+    # --- create backup dir ---
+    try:
+        backup_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        log_error(f"Cannot create backup directory '{backup_dir}': {exc}")
+        sys.exit(1)
+
     # --- resolve SPLUNK_DB ---
     splunk_db = resolve_splunk_db(splunk_home)
     log_info(f"SPLUNK_HOME : {splunk_home}")
     log_info(f"SPLUNK_DB   : {splunk_db}")
+    log_info(f"Backup dir  : {backup_dir}")
     if not splunk_db.is_dir():
         log_error(f"SPLUNK_DB directory does not exist: {splunk_db}")
         sys.exit(1)
@@ -342,13 +361,13 @@ def main() -> None:
     # --- splunkd running warning ---
     if splunkd_is_running():
         log_warn(
-            "splunkd appears to be running. Removing .bucketManifest files while "
+            "splunkd appears to be running. Moving .bucketManifest files while "
             "Splunk is running is generally safe — Splunk will regenerate them — "
             "but verify this is intentional before proceeding."
         )
 
     if args.dry_run:
-        log_info("Dry-run mode enabled — no files will be deleted.")
+        log_info("Dry-run mode enabled — no files will be moved.")
 
     print()
 
@@ -358,7 +377,7 @@ def main() -> None:
     print()
 
     # --- process ---
-    summary = process_buckets(bids, splunk_db, dry_run=args.dry_run)
+    summary = process_buckets(bids, splunk_db, backup_dir, dry_run=args.dry_run)
     print_summary(summary, dry_run=args.dry_run)
 
     if summary["errors"] > 0:
