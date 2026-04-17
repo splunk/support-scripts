@@ -1,10 +1,10 @@
 # Bucket Manifest Cleaner
 
-A two-script toolkit for identifying and removing stale `.bucketmanifest` files from Splunk index buckets. Stale manifests can prevent buckets from being frozen/archived — `find_bucket_manifests.py` locates the affected buckets, and `remove_bucket_manifests.py` removes the manifest files.
+A two-script toolkit for identifying and removing stale `.bucketManifest` files from Splunk index buckets. Stale manifests can prevent buckets from being frozen/archived — `find_bucket_manifests.py` locates the affected buckets, and `remove_bucket_manifests.py` removes the manifest files.
 
 ## Purpose
 
-When Splunk logs `freeze skipped for bid=<bucket_id>` in `splunkd.log`, it typically indicates a bucket has a stale or corrupt `.bucketmanifest` file that is preventing normal freeze/archive lifecycle operations. This toolkit automates the discovery and cleanup process.
+When Splunk logs `freeze skipped for bid=<bucket_id>` in `splunkd.log`, it typically indicates a bucket has a stale or corrupt `.bucketManifest` file that is preventing normal freeze/archive lifecycle operations. This toolkit automates the discovery and cleanup process.
 
 ## Requirements
 
@@ -118,8 +118,8 @@ $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --splunk-ho
 
 [INFO]  Loaded 3 bucket ID(s) from buckets.csv
 
-[OK]    Removed: /opt/splunk/var/lib/splunk/myindex/db/db_1746000000_1745000000_35_B5C33FDC-F337-4971-A01E-FE46B75AABE3/.bucketmanifest
-[OK]    Removed: /opt/splunk/var/lib/splunk/_internaldb/db/db_1746000000_1745000000_42/.bucketmanifest
+[OK]    Removed: /opt/splunk/var/lib/splunk/myindex/db/db_1746000000_1745000000_35_B5C33FDC-F337-4971-A01E-FE46B75AABE3/.bucketManifest
+[OK]    Removed: /opt/splunk/var/lib/splunk/_internaldb/db/db_1746000000_1745000000_42/.bucketManifest
 [INFO]  No manifest present (already clean): ...
 
 ==================================================
@@ -137,7 +137,7 @@ Summary
 
 ## Notes
 
-- **Safe while Splunk is running.** Splunk regenerates `.bucketmanifest` files automatically; removing them will not cause data loss. The script warns if `splunkd` is detected running, but does not block execution.
+- **Safe while Splunk is running.** Splunk regenerates `.bucketManifest` files automatically; removing them will not cause data loss. The script warns if `splunkd` is detected running, but does not block execution.
 - **`SPLUNK_DB` resolution.** The remove script checks the `SPLUNK_DB` env var, then `splunk-launch.conf`, then falls back to `$SPLUNK_HOME/var/lib/splunk` — consistent with how Splunk itself resolves the path.
 - **Bucket tiers searched.** `db/`, `colddb/`, and `thaweddb/` are all scanned. `frozendb` is excluded as frozen buckets are not managed by Splunk's lifecycle.
 - **Ambiguity guard.** If more than one directory matches a given bucket ID, that row is skipped and logged as a warning rather than guessing.

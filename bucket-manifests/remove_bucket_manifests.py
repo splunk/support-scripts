@@ -4,7 +4,7 @@ Splunk Bucket Manifest Cleaner
 
 Reads a CSV file containing a list of bucket IDs (bid) in the format
 <index>~<seqno>~<peer_guid>, resolves each bucket's directory on disk,
-and removes the .bucketmanifest file from that directory.
+and removes the .bucketManifest file from that directory.
 
 Usage:
     $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv
@@ -206,7 +206,7 @@ def find_bucket_dir(splunk_db: Path, index_name: str, seqno: str, guid: str) -> 
 def process_buckets(bids: list, splunk_db: Path, dry_run: bool) -> dict:
     """
     Iterate over parsed bid entries, resolve the bucket directory, and
-    remove (or report) the .bucketmanifest file.
+    remove (or report) the .bucketManifest file.
 
     Returns a summary dict.
     """
@@ -250,7 +250,7 @@ def process_buckets(bids: list, splunk_db: Path, dry_run: bool) -> dict:
             continue
 
         bucket_dir = matches[0]
-        manifest = bucket_dir / ".bucketmanifest"
+        manifest = bucket_dir / ".bucketManifest"
 
         # --- act ---
         if not manifest.exists():
@@ -296,7 +296,7 @@ def print_summary(summary: dict, dry_run: bool) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Remove .bucketmanifest files for a list of Splunk bucket IDs. "
+            "Remove .bucketManifest files for a list of Splunk bucket IDs. "
             "Bucket IDs must follow the format <index>~<seqno>~<peer_guid>."
         )
     )
@@ -342,7 +342,7 @@ def main() -> None:
     # --- splunkd running warning ---
     if splunkd_is_running():
         log_warn(
-            "splunkd appears to be running. Removing .bucketmanifest files while "
+            "splunkd appears to be running. Removing .bucketManifest files while "
             "Splunk is running is generally safe — Splunk will regenerate them — "
             "but verify this is intentional before proceeding."
         )

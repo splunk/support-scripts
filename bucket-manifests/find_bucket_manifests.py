@@ -7,7 +7,7 @@ By default, parses splunkd.log* for buckets whose freeze was skipped
 use with remove_bucket_manifests.py.
 
 Use --scan for filesystem-based discovery (walks SPLUNK_DB looking for
-buckets that actually have a .bucketmanifest file on disk).
+buckets that actually have a .bucketManifest file on disk).
 
 Usage:
     # Default: extract skipped-freeze bids from splunkd.log
@@ -26,7 +26,7 @@ Options:
     --limit         N      Stop after finding N matching buckets
     --output        FILE   Write CSV to this file (default: buckets.csv)
     --log-dir       PATH   Directory containing splunkd.log* (default: $SPLUNK_HOME/var/log/splunk)
-    --scan                 Walk SPLUNK_DB for .bucketmanifest files instead of parsing logs
+    --scan                 Walk SPLUNK_DB for .bucketManifest files instead of parsing logs
     --debug                Print detailed diagnostic info during the search
 """
 
@@ -115,7 +115,7 @@ def resolve_splunk_db(splunk_home: Path) -> Path:
 def iter_manifests(splunk_db: Path, index_filter: list, limit: int, debug: bool = False):
     """
     Yield (index_name, seqno, guid) tuples for every bucket directory that
-    contains a .bucketmanifest file.
+    contains a .bucketManifest file.
 
     Stops after `limit` results (0 = unlimited).
     """
@@ -166,11 +166,11 @@ def iter_manifests(splunk_db: Path, index_filter: list, limit: int, debug: bool 
                 m = BUCKET_DIR_RE.match(bucket_dir.name)
                 if not m:
                     if debug:
-                        manifest_marker = " [has .bucketmanifest]" if (bucket_dir / ".bucketmanifest").exists() else ""
+                        manifest_marker = " [has .bucketManifest]" if (bucket_dir / ".bucketManifest").exists() else ""
                         log_debug(f"  No regex match: {bucket_dir.name}{manifest_marker}")
                     continue  # not a standard bucket directory
 
-                manifest = bucket_dir / ".bucketmanifest"
+                manifest = bucket_dir / ".bucketManifest"
                 if not manifest.exists():
                     if debug:
                         log_debug(f"  Matched, no manifest: {bucket_dir.name}")
@@ -288,7 +288,7 @@ def main() -> None:
         "--scan",
         action="store_true",
         help=(
-            "Walk SPLUNK_DB directories for buckets that have a .bucketmanifest file "
+            "Walk SPLUNK_DB directories for buckets that have a .bucketManifest file "
             "instead of parsing splunkd.log (lab/demo mode)."
         ),
     )

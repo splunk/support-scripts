@@ -14,7 +14,6 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Data Privacy](#data-privacy)
     - [Cluster \& Network Diagnostics](#cluster--network-diagnostics)
     - [Storage \& Volume Management](#storage--volume-management)
-      - [Bucket Manifest Cleaner](#bucket-manifest-cleaner)
     - [Performance \& Diagnostics](#performance--diagnostics)
     - [Testing \& Validation](#testing--validation)
   - [General Requirements](#general-requirements)
