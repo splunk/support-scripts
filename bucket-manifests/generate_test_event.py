@@ -91,7 +91,7 @@ def build_event(bid: str) -> dict:
         "host":       "test-splunk-host",
         "source":     "splunkd.log",
         "sourcetype": "splunkd",
-        "index":      "main",
+        "index":      "_splunkd",
         "event":      raw,
     }
 

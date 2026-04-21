@@ -52,8 +52,6 @@ $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-di
 ./remove_bucket_manifests.sh --csv buckets.csv --backup /tmp/manifest_backup
 ```
 
----
-
 ## find_bucket_manifests.py
 
 ### Options
@@ -92,8 +90,6 @@ Single column with header `bid`. Bucket IDs follow Splunk's native format:
 
 - **Clustered indexer:** `<index>~<seqno>~<peer_guid>`
 - **Standalone indexer:** `<index>~<seqno>`
-
----
 
 ## remove_bucket_manifests.py
 
@@ -144,8 +140,6 @@ Summary
   Errors               : 0
 ==================================================
 ```
-
----
 
 ## generate_test_event.py
 
@@ -198,8 +192,6 @@ $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-di
 ```
 
 > **Note:** The event lands in `index=_splunkd`. To confirm receipt before running the find script, search `index=_splunkd "freeze skipped for bid"` in Splunk.
-
----
 
 ## remove_bucket_manifests.sh
 

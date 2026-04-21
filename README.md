@@ -24,6 +24,7 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Submitting Scripts](#submitting-scripts)
   - [Authors](#authors)
   - [Changelog](#changelog)
+    - [v1.7.0 - 2026-04-21](#v170---2026-04-21)
     - [v1.6.1 - 2026-04-09](#v161---2026-04-09)
     - [v1.6.0 - 2026-04-08](#v160---2026-04-08)
     - [v1.5.0 - 2026-04-01](#v150---2026-04-01)
@@ -113,10 +114,10 @@ Requires Splunk Enterprise access. See individual tool READMEs for detailed usag
 - **Problem**: Need visibility into how Splunk indexes map to underlying storage volumes across hot, cold, and frozen tiers
 - **Solution**: Uses btool and findmnt to show each index's storage mount point and filesystem type
 
-**[Bucket Manifest Cleaner](bucket-manifests/README.md)** - Identify and remove stale `.bucketmanifest` files blocking bucket freeze
+**[Bucket Manifest Cleaner](bucket-manifests/README.md)** - Identify and remove stale `.bucketManifest` files blocking bucket freeze
 
 - **Problem**: Buckets log `freeze skipped for bid=` in `splunkd.log` and fail to archive due to stale manifest files
-- **Solution**: Parses `splunkd.log*` to extract affected bucket IDs, then resolves and removes the corresponding `.bucketmanifest` files
+- **Solution**: Parses `splunkd.log*` to extract affected bucket IDs, then resolves and removes the corresponding `.bucketManifest` files
 
 ### Performance & Diagnostics
 
@@ -251,11 +252,11 @@ Send scripts to the repository maintainer for review. Include:
 
 ## Changelog
 
-### v1.7.0 - 2026-04-09
+### v1.7.0 - 2026-04-21
 
 **Added:**
 
-- `bucket-manifests` - Two-script toolkit to find and remove stale `.bucketmanifest` files that prevent bucket freeze. `find_bucket_manifests.py` parses `splunkd.log*` for skipped-freeze bucket IDs; `remove_bucket_manifests.py` resolves and removes the manifest files with dry-run support
+- `bucket-manifests` - Two-script toolkit to find and remove stale `.bucketManifest` files that prevent bucket freeze. `find_bucket_manifests.py` parses `splunkd.log*` for skipped-freeze bucket IDs; `remove_bucket_manifests.py` resolves and removes the manifest files with dry-run support
 
 ### v1.6.1 - 2026-04-09
 
