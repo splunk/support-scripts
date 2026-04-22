@@ -143,9 +143,9 @@ Summary
 
 ## generate_test_event.py
 
-Sends a synthetic `freeze skipped for bid=` log line to Splunk via HEC, targeting `index=_splunkd` with `sourcetype=splunkd`.
+Sends a synthetic `freeze skipped for bid=` log line to Splunk via HEC, targeting `index=main` with `sourcetype=splunkd`. HEC cannot write to internal indexes, so `main` is used instead of `_splunkd`.
 
-> **Limitation:** `generate_test_event.py` successfully delivers events to Splunk, but it is **not yet fully compatible with `find_bucket_manifests.py`**. Events sent via HEC are written to the `_splunkd` index — they are searchable in Splunk but are **not appended to the `splunkd.log` file on disk**. Because `find_bucket_manifests.py` parses `splunkd.log*` files directly (not REST/search results), it will not find bids injected this way. To confirm a test event was received, search `index=_splunkd "freeze skipped for bid"` in Splunk. Use `--scan` mode in `find_bucket_manifests.py` to discover manifests by filesystem walk instead.
+> **Limitation:** `generate_test_event.py` successfully delivers events to Splunk, but it is **not yet fully compatible with `find_bucket_manifests.py`**. Events sent via HEC are written to the `main` index — they are searchable in Splunk but are **not appended to the `splunkd.log` file on disk**. Because `find_bucket_manifests.py` parses `splunkd.log*` files directly (not REST/search results), it will not find bids injected this way. To confirm a test event was received, search `index=main "freeze skipped for bid"` in Splunk. Use `--scan` mode in `find_bucket_manifests.py` to discover manifests by filesystem walk instead.
 
 ### Options
 
@@ -182,7 +182,7 @@ $SPLUNK_HOME/bin/python generate_test_event.py --token <HEC_TOKEN> --splunk-host
 # 1. Send a test event
 $SPLUNK_HOME/bin/python generate_test_event.py --token <HEC_TOKEN> --bid _internaldb~42 --no-ssl-verify
 
-# 2. Confirm receipt in Splunk (search index=_splunkd "freeze skipped for bid")
+# 2. Confirm receipt in Splunk (search index=main "freeze skipped for bid")
 #    Then use --scan to find manifests on disk
 $SPLUNK_HOME/bin/python find_bucket_manifests.py --scan --output buckets.csv
 
@@ -191,7 +191,7 @@ $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-di
 $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifest_backup
 ```
 
-> **Note:** The event lands in `index=_splunkd`. To confirm receipt before running the find script, search `index=_splunkd "freeze skipped for bid"` in Splunk.
+> **Note:** The event lands in `index=main`. To confirm receipt before running the find script, search `index=main "freeze skipped for bid"` in Splunk.
 
 ## remove_bucket_manifests.sh
 

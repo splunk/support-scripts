@@ -8,7 +8,7 @@ find_bucket_manifests.py has something to find in splunkd.log.
 The event mimics the real BucketMover log format:
   02-20-2026 11:43:53.188 -0600 INFO BucketMover [3148854 FilesystemOpExecutorWorker-0] - RemoteStorageAsyncFreezer freeze skipped for bid=<bid> since bucket was not stable
 
-The event is written to index=_splunkd with sourcetype=splunkd.
+The event is written to index=main with sourcetype=splunkd.
 
 Usage:
     $SPLUNK_HOME/bin/python generate_test_event.py --token <HEC_TOKEN>
@@ -73,7 +73,7 @@ def make_bid(index: str = "testindex") -> str:
 def build_event(bid: str) -> dict:
     """
     Build a HEC JSON payload matching the real BucketMover log format.
-    Targeting index=_splunkd so it doesn't pollute customer data indexes.
+    Targeting index=main (HEC cannot write to internal indexes).
     """
     now = datetime.now().astimezone()
     tz_offset = now.strftime("%z")          # e.g. -0600
@@ -91,7 +91,7 @@ def build_event(bid: str) -> dict:
         "host":       "test-splunk-host",
         "source":     "splunkd.log",
         "sourcetype": "splunkd",
-        "index":      "_splunkd",
+        "index":      "main",
         "event":      raw,
     }
 
@@ -222,9 +222,9 @@ def main() -> None:
         log_error(f"{errors}/{args.count} event(s) failed to send.")
         sys.exit(1)
     else:
-        log_success(f"All {args.count} event(s) sent to index=_splunkd.")
+        log_success(f"All {args.count} event(s) sent to index=main.")
         log_info(
-            "To verify: search  index=_splunkd \"freeze skipped for bid\"  in Splunk."
+            "To verify: search  index=main \"freeze skipped for bid\"  in Splunk."
         )
         log_info(
             "To find via log parser: "
