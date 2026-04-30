@@ -389,17 +389,19 @@ class CertificateVerifier:
             cert_info = {"path": cert_path, "verified": True, "text": stdout}
 
             # Extract expiration date
+            # Note: We check for actual output instead of just return code,
+            # as some OpenSSL versions may return non-zero even with valid output
             exp_success, exp_stdout, _ = self._run_openssl_command(
                 ["x509", "-in", cert_path, "-enddate", "-noout"]
             )
-            if exp_success:
+            if exp_success or ("notAfter=" in exp_stdout):
                 cert_info["expiration"] = exp_stdout.strip()
 
             # Extract subject
             subj_success, subj_stdout, _ = self._run_openssl_command(
                 ["x509", "-in", cert_path, "-subject", "-noout"]
             )
-            if subj_success:
+            if subj_success or ("subject=" in subj_stdout):
                 cert_info["subject"] = subj_stdout.strip()
 
             return cert_info
@@ -433,22 +435,25 @@ class CertificateVerifier:
                 ["x509", "-in", ca_path, "-text", "-noout"]
             )
 
-            if success:
-                return {
-                    "path": ca_path,
-                    "content": content,
-                    "count": cert_count,
-                    "verified": True,
-                    "text": stdout,
-                }
-            else:
+            cert_info = {
+                "path": ca_path,
+                "content": content,
+                "count": cert_count,
+                "verified": success,
+                "text": stdout,
+            }
+
+            # Extract expiration date (similar to _load_certificate_openssl)
+            exp_success, exp_stdout, _ = self._run_openssl_command(
+                ["x509", "-in", ca_path, "-enddate", "-noout"]
+            )
+            if exp_success or ("notAfter=" in exp_stdout):
+                cert_info["expiration"] = exp_stdout.strip()
+
+            if not success:
                 self.log_warning(f"CA certificate verification had issues: {stderr}")
-                return {
-                    "path": ca_path,
-                    "content": content,
-                    "count": cert_count,
-                    "verified": False,
-                }
+
+            return cert_info
 
         except Exception as e:
             self.log_error(f"Error reading CA file {ca_path}: {e}")
