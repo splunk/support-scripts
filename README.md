@@ -24,6 +24,7 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Submitting Scripts](#submitting-scripts)
   - [Authors](#authors)
   - [Changelog](#changelog)
+    - [v1.7.1 - 2026-05-04](#v171---2026-05-04)
     - [v1.7.0 - 2026-04-21](#v170---2026-04-21)
     - [v1.6.1 - 2026-04-09](#v161---2026-04-09)
     - [v1.6.0 - 2026-04-08](#v160---2026-04-08)
@@ -251,6 +252,12 @@ Send scripts to the repository maintainer for review. Include:
 - Rob Hilgefort (rhilgefort@splunk.com) - Repository setup, review, and stewardship
 
 ## Changelog
+
+### v1.7.1 - 2026-05-04
+
+**Updated:**
+
+- `kvcertverify` - Fixed CA cert expiry check in OpenSSL fallback mode (was silently skipped because `_load_ca_certificate_openssl` never populated the `expiration` field)
 
 ### v1.7.0 - 2026-04-21
 
