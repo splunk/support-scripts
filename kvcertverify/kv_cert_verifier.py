@@ -434,13 +434,22 @@ class CertificateVerifier:
             )
 
             if success:
-                return {
+                ca_info = {
                     "path": ca_path,
                     "content": content,
                     "count": cert_count,
                     "verified": True,
                     "text": stdout,
                 }
+
+                # Extract expiration date so check_certificate_expiry works in fallback mode
+                exp_success, exp_stdout, _ = self._run_openssl_command(
+                    ["x509", "-in", ca_path, "-enddate", "-noout"]
+                )
+                if exp_success:
+                    ca_info["expiration"] = exp_stdout.strip()
+
+                return ca_info
             else:
                 self.log_warning(f"CA certificate verification had issues: {stderr}")
                 return {
