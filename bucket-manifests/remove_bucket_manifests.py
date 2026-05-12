@@ -4,12 +4,13 @@ Splunk Bucket Manifest Cleaner
 
 Reads a CSV file containing a list of bucket IDs (bid) in the format
 <index>~<seqno>~<peer_guid>, resolves each bucket's directory on disk,
-and moves the .bucketManifest file to a backup directory.
+moves the entire bucket directory to a backup location, and removes
+the corresponding entry from the index-level manifest file.
 
 Usage:
-    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifests
-    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifests --dry-run
-    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifests --splunk-home /opt/splunk
+    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/bucket_backup
+    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/bucket_backup --dry-run
+    $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/bucket_backup --splunk-home /opt/splunk
 
 CSV format (single column, header required):
     bid
@@ -185,19 +186,96 @@ def parse_bid(bid: str):
 
 def find_bucket_dir(splunk_db: Path, index_name: str, seqno: str, guid: str) -> list:
     """
-    Glob across all tiers under $SPLUNK_DB/<index>/<tier>/ looking for
-    a directory matching:
-      Clustered:  db_*_*_<seqno>_<guid>
-      Standalone: db_*_*_<seqno>
-    Returns a list of matched Path objects (usually 0 or 1).
+    Find bucket directories matching the given index, seqno, and optional guid.
+    Searches in db/, colddb/, and thaweddb/ tiers.
+    Returns a list of matching Path objects.
     """
-    pattern_suffix = f"db_*_*_{seqno}_{guid}" if guid else f"db_*_*_{seqno}"
     matches = []
+
     for tier in TIERS:
-        tier_path = splunk_db / index_name / tier
-        candidates = glob.glob(str(tier_path / pattern_suffix))
-        matches.extend(Path(c) for c in candidates if Path(c).is_dir())
+        index_dir = splunk_db / index_name / tier
+        if not index_dir.exists():
+            continue
+
+        # Pattern: db_<latest>_<earliest>_<seqno>[_<guid>]
+        # The guid is optional for standalone deployments
+        if guid:
+            pattern = f"db_*_*_{seqno}_{guid}"
+        else:
+            pattern = f"db_*_*_{seqno}"
+
+        # Use glob to find matching directories
+        for bucket_dir in index_dir.glob(pattern):
+            if bucket_dir.is_dir():
+                matches.append(bucket_dir)
+
     return matches
+
+
+def update_index_manifest(
+    splunk_db: Path, index_name: str, backup_dir: Path, dry_run: bool
+) -> tuple[bool, bool]:
+    """
+    Update the index-level manifest file to remove entries for buckets that have been moved.
+    Looks for manifest files in each tier (db, colddb, thaweddb) under the index directory.
+
+    Returns (manifest_updated, manifest_found).
+    """
+    manifest_updated = False
+    manifest_found = False
+
+    for tier in TIERS:
+        manifest_path = splunk_db / index_name / tier / ".bucketManifest"
+        if not manifest_path.exists():
+            continue
+
+        manifest_found = True
+
+        try:
+            # Read the manifest file
+            with open(manifest_path, "r") as f:
+                lines = f.readlines()
+
+            # Filter out lines that reference moved buckets
+            # Manifest lines typically contain bucket directory names
+            original_count = len(lines)
+            filtered_lines = []
+
+            for line in lines:
+                stripped = line.strip()
+                if not stripped:
+                    filtered_lines.append(line)
+                    continue
+
+                # Check if this line references a bucket that was moved
+                bucket_moved = False
+                for backup_item in backup_dir.iterdir():
+                    if backup_item.is_dir() and backup_item.name in stripped:
+                        bucket_moved = True
+                        break
+
+                if not bucket_moved:
+                    filtered_lines.append(line)
+
+            # Write back the filtered manifest if it changed
+            if len(filtered_lines) != original_count:
+                if dry_run:
+                    log_dryrun(
+                        f"Would update {manifest_path}: {original_count} -> {len(filtered_lines)} lines"
+                    )
+                else:
+                    with open(manifest_path, "w") as f:
+                        f.writelines(filtered_lines)
+                    log_info(
+                        f"Updated {manifest_path}: removed {original_count - len(filtered_lines)} bucket entries"
+                    )
+                manifest_updated = True
+
+        except Exception as exc:
+            log_error(f"Failed to update manifest {manifest_path}: {exc}")
+            raise
+
+    return manifest_updated, manifest_found
 
 
 # ---------------------------------------------------------------------------
@@ -206,20 +284,26 @@ def find_bucket_dir(splunk_db: Path, index_name: str, seqno: str, guid: str) -> 
 
 def process_buckets(bids: list, splunk_db: Path, backup_dir: Path, dry_run: bool) -> dict:
     """
-    Iterate over parsed bid entries, resolve the bucket directory, and
-    move (or report) the .bucketManifest file to backup_dir.
+    Iterate over parsed bid entries, resolve the bucket directory, move
+    the entire bucket directory to backup_dir, and remove the corresponding
+    entry from the index-level manifest file.
 
     Returns a summary dict.
     """
     summary = {
         "total":         0,
-        "removed":       0,
+        "moved":         0,
         "already_clean": 0,
         "not_found":     0,
         "ambiguous":     0,
         "errors":        0,
         "skipped":       0,
+        "manifest_updated": 0,
+        "manifest_errors": 0,
     }
+
+    # Track which indices we've processed to avoid redundant manifest updates
+    processed_indices = set()
 
     for lineno, bid in bids:
         summary["total"] += 1
@@ -251,45 +335,64 @@ def process_buckets(bids: list, splunk_db: Path, backup_dir: Path, dry_run: bool
             continue
 
         bucket_dir = matches[0]
-        manifest = bucket_dir / ".bucketManifest"
 
         # --- act ---
-        if not manifest.exists():
-            log_info(f"No manifest present (already clean): {manifest}")
-            summary["already_clean"] += 1
-            continue
-
         if dry_run:
-            log_dryrun(f"Would move: {manifest} -> {backup_dir}/")
-            summary["removed"] += 1
+            log_dryrun(f"Would move bucket directory: {bucket_dir} -> {backup_dir}/")
+            summary["moved"] += 1
         else:
             try:
-                # Preserve uniqueness: prefix with bucket dir name to avoid
-                # collisions when multiple indices have seqno 0, etc.
-                dest = backup_dir / f"{bucket_dir.name}_{manifest.name}"
-                shutil.move(str(manifest), str(dest))
-                log_success(f"Moved: {manifest} -> {dest}")
-                summary["removed"] += 1
+                # Move the entire bucket directory to backup
+                dest = backup_dir / bucket_dir.name
+                shutil.move(str(bucket_dir), str(dest))
+                log_success(f"Moved bucket directory: {bucket_dir} -> {dest}")
+                summary["moved"] += 1
+
+                # Track this index for manifest cleanup
+                processed_indices.add(index_name)
+
             except OSError as exc:
-                log_error(f"Line {lineno}: failed to move {manifest} — {exc}")
+                log_error(f"Line {lineno}: failed to move bucket directory {bucket_dir} — {exc}")
                 summary["errors"] += 1
+
+    # Update index-level manifests for processed indices
+    for index_name in processed_indices:
+        try:
+            updated, found = update_index_manifest(
+                splunk_db, index_name, backup_dir, dry_run
+            )
+            if updated:
+                summary["manifest_updated"] += 1
+                if not dry_run:
+                    log_success(f"Updated manifest for index: {index_name}")
+                else:
+                    log_dryrun(f"Would update manifest for index: {index_name}")
+            elif found:
+                log_info(f"No manifest entries needed updating for index: {index_name}")
+            else:
+                log_info(f"No manifest file found for index: {index_name}; skipping manifest cleanup")
+        except Exception as exc:
+            log_error(f"Failed to update manifest for index {index_name}: {exc}")
+            summary["manifest_errors"] += 1
 
     return summary
 
 
 def print_summary(summary: dict, dry_run: bool) -> None:
     label = "Would move" if dry_run else "Moved"
+    manifest_label = "Would update" if dry_run else "Updated"
     print()
     print(f"{Colors.BOLD}{'=' * 50}{Colors.ENDC}")
     print(f"{Colors.BOLD}Summary{Colors.ENDC}")
     print(f"{'=' * 50}")
-    print(f"  Total buckets in CSV : {summary['total']}")
-    print(f"  {label:<22}: {summary['removed']}")
-    print(f"  Already clean        : {summary['already_clean']}")
-    print(f"  Not found on disk    : {summary['not_found']}")
-    print(f"  Ambiguous matches    : {summary['ambiguous']}")
-    print(f"  Malformed / skipped  : {summary['skipped']}")
-    print(f"  Errors               : {summary['errors']}")
+    print(f"  Total buckets in CSV    : {summary['total']}")
+    print(f"  {label} bucket dirs      : {summary['moved']}")
+    print(f"  {manifest_label} manifests   : {summary['manifest_updated']}")
+    print(f"  Not found on disk       : {summary['not_found']}")
+    print(f"  Ambiguous matches       : {summary['ambiguous']}")
+    print(f"  Malformed / skipped     : {summary['skipped']}")
+    print(f"  Errors                  : {summary['errors']}")
+    print(f"  Manifest update errors  : {summary['manifest_errors']}")
     print(f"{'=' * 50}")
 
 
