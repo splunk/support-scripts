@@ -4,7 +4,13 @@ Splunk Bucket Manifest Cleaner
 
 Reads a CSV file containing a list of bucket IDs (bid) in the format
 <index>~<seqno>~<peer_guid>, resolves each bucket's directory on disk,
-and moves the .bucketManifest file to a backup directory.
+moves the entire bucket folder to a backup directory, and removes the
+matching bucket line from the tier-level .bucketManifest file.
+
+The tier-level .bucketManifest is built off of the bucket folders, so
+removing only the manifest is insufficient — Splunk would rebuild the
+same stale entry from the folder. Moving the folder and pruning the
+manifest line ensures a clean removal.
 
 Usage:
     $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifests
@@ -204,17 +210,56 @@ def find_bucket_dir(splunk_db: Path, index_name: str, seqno: str, guid: str) -> 
 # Main logic
 # ---------------------------------------------------------------------------
 
+def prune_manifest_line(manifest_path: Path, bucket_name: str) -> str:
+    """
+    Remove any line in the tier-level .bucketManifest that references the
+    given bucket directory name. Returns one of: "pruned", "absent",
+    "missing" (manifest file not present).
+
+    The manifest is rewritten in-place via a temp file + atomic replace to
+    avoid leaving a half-written file if interrupted.
+    """
+    if not manifest_path.exists():
+        return "missing"
+
+    try:
+        with open(manifest_path, "r") as fh:
+            lines = fh.readlines()
+    except OSError as exc:
+        raise OSError(f"cannot read {manifest_path}: {exc}")
+
+    kept = [ln for ln in lines if bucket_name not in ln]
+    if len(kept) == len(lines):
+        return "absent"
+
+    tmp_path = manifest_path.with_suffix(manifest_path.suffix + ".tmp")
+    try:
+        with open(tmp_path, "w") as fh:
+            fh.writelines(kept)
+        os.replace(str(tmp_path), str(manifest_path))
+    except OSError as exc:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+        raise OSError(f"cannot rewrite {manifest_path}: {exc}")
+
+    return "pruned"
+
+
 def process_buckets(bids: list, splunk_db: Path, backup_dir: Path, dry_run: bool) -> dict:
     """
-    Iterate over parsed bid entries, resolve the bucket directory, and
-    move (or report) the .bucketManifest file to backup_dir.
+    Iterate over parsed bid entries, resolve the bucket directory, move
+    the entire bucket folder to backup_dir, and prune the matching line
+    from the tier-level .bucketManifest.
 
     Returns a summary dict.
     """
     summary = {
         "total":         0,
-        "removed":       0,
-        "already_clean": 0,
+        "moved":         0,
+        "manifest_pruned": 0,
         "not_found":     0,
         "ambiguous":     0,
         "errors":        0,
@@ -251,41 +296,61 @@ def process_buckets(bids: list, splunk_db: Path, backup_dir: Path, dry_run: bool
             continue
 
         bucket_dir = matches[0]
-        manifest = bucket_dir / ".bucketManifest"
+        tier_manifest = bucket_dir.parent / ".bucketManifest"
 
         # --- act ---
-        if not manifest.exists():
-            log_info(f"No manifest present (already clean): {manifest}")
-            summary["already_clean"] += 1
+        if dry_run:
+            log_dryrun(f"Would move: {bucket_dir} -> {backup_dir}/{bucket_dir.name}")
+            if tier_manifest.exists():
+                log_dryrun(f"Would prune '{bucket_dir.name}' entry from: {tier_manifest}")
+            else:
+                log_dryrun(f"No tier-level manifest at: {tier_manifest} (nothing to prune)")
+            summary["moved"] += 1
             continue
 
-        if dry_run:
-            log_dryrun(f"Would move: {manifest} -> {backup_dir}/")
-            summary["removed"] += 1
-        else:
-            try:
-                # Preserve uniqueness: prefix with bucket dir name to avoid
-                # collisions when multiple indices have seqno 0, etc.
-                dest = backup_dir / f"{bucket_dir.name}_{manifest.name}"
-                shutil.move(str(manifest), str(dest))
-                log_success(f"Moved: {manifest} -> {dest}")
-                summary["removed"] += 1
-            except OSError as exc:
-                log_error(f"Line {lineno}: failed to move {manifest} — {exc}")
+        try:
+            dest = backup_dir / bucket_dir.name
+            if dest.exists():
+                log_warn(
+                    f"Line {lineno}: backup destination already exists, skipping: {dest}"
+                )
                 summary["errors"] += 1
+                continue
+            shutil.move(str(bucket_dir), str(dest))
+            log_success(f"Moved folder: {bucket_dir} -> {dest}")
+            summary["moved"] += 1
+        except OSError as exc:
+            log_error(f"Line {lineno}: failed to move {bucket_dir} — {exc}")
+            summary["errors"] += 1
+            continue
+
+        try:
+            result = prune_manifest_line(tier_manifest, bucket_dir.name)
+            if result == "pruned":
+                log_success(f"Pruned entry '{bucket_dir.name}' from {tier_manifest}")
+                summary["manifest_pruned"] += 1
+            elif result == "absent":
+                log_info(f"No entry for '{bucket_dir.name}' in {tier_manifest}")
+            elif result == "missing":
+                log_info(f"No tier-level manifest at: {tier_manifest}")
+        except OSError as exc:
+            log_error(f"Line {lineno}: {exc}")
+            summary["errors"] += 1
 
     return summary
 
 
 def print_summary(summary: dict, dry_run: bool) -> None:
-    label = "Would move" if dry_run else "Moved"
+    label = "Would move" if dry_run else "Moved folders"
+    prune_label = "Would prune manifest lines" if dry_run else "Pruned manifest lines"
     print()
     print(f"{Colors.BOLD}{'=' * 50}{Colors.ENDC}")
     print(f"{Colors.BOLD}Summary{Colors.ENDC}")
     print(f"{'=' * 50}")
     print(f"  Total buckets in CSV : {summary['total']}")
-    print(f"  {label:<22}: {summary['removed']}")
-    print(f"  Already clean        : {summary['already_clean']}")
+    print(f"  {label:<22}: {summary['moved']}")
+    if not dry_run:
+        print(f"  {prune_label:<22}: {summary['manifest_pruned']}")
     print(f"  Not found on disk    : {summary['not_found']}")
     print(f"  Ambiguous matches    : {summary['ambiguous']}")
     print(f"  Malformed / skipped  : {summary['skipped']}")
@@ -300,7 +365,8 @@ def print_summary(summary: dict, dry_run: bool) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Move .bucketManifest files for a list of Splunk bucket IDs to a backup directory. "
+            "Move entire bucket folders for a list of Splunk bucket IDs to a backup directory "
+            "and prune the matching bucket lines from the tier-level .bucketManifest. "
             "Bucket IDs must follow the format <index>~<seqno> or <index>~<seqno>~<peer_guid>."
         )
     )
@@ -314,7 +380,7 @@ def main() -> None:
         "--backup-dir",
         required=True,
         metavar="PATH",
-        help="Directory to move .bucketManifest files into (created if it does not exist).",
+        help="Directory to move bucket folders into (created if it does not exist).",
     )
     parser.add_argument(
         "--splunk-home",
@@ -325,7 +391,7 @@ def main() -> None:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print what would be moved without touching anything.",
+        help="Print what would be moved/pruned without touching anything.",
     )
     args = parser.parse_args()
 
@@ -361,9 +427,9 @@ def main() -> None:
     # --- splunkd running warning ---
     if splunkd_is_running():
         log_warn(
-            "splunkd appears to be running. Moving .bucketManifest files while "
-            "Splunk is running is generally safe — Splunk will regenerate them — "
-            "but verify this is intentional before proceeding."
+            "splunkd appears to be running. Moving bucket folders while Splunk "
+            "is running can cause search errors or data inconsistency — strongly "
+            "consider stopping splunkd before proceeding."
         )
 
     if args.dry_run:
