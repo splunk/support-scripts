@@ -24,6 +24,7 @@ A curated collection of diagnostic and administrative tools for Splunk environme
     - [Submitting Scripts](#submitting-scripts)
   - [Authors](#authors)
   - [Changelog](#changelog)
+    - [v1.7.2 - 2026-05-14](#v172---2026-05-14)
     - [v1.7.1 - 2026-05-04](#v171---2026-05-04)
     - [v1.7.0 - 2026-04-21](#v170---2026-04-21)
     - [v1.6.1 - 2026-04-09](#v161---2026-04-09)
@@ -115,10 +116,10 @@ Requires Splunk Enterprise access. See individual tool READMEs for detailed usag
 - **Problem**: Need visibility into how Splunk indexes map to underlying storage volumes across hot, cold, and frozen tiers
 - **Solution**: Uses btool and findmnt to show each index's storage mount point and filesystem type
 
-**[Bucket Manifest Cleaner](bucket-manifests/README.md)** - Identify and remove stale `.bucketManifest` files blocking bucket freeze
+**[Bucket Manifest Cleaner](bucket-manifests/README.md)** - Identify and remove stale Splunk index buckets blocking bucket freeze
 
-- **Problem**: Buckets log `freeze skipped for bid=` in `splunkd.log` and fail to archive due to stale manifest files
-- **Solution**: Parses `splunkd.log*` to extract affected bucket IDs, then resolves and removes the corresponding `.bucketManifest` files
+- **Problem**: Buckets log `freeze skipped for bid=` in `splunkd.log` and fail to archive because the tier-level `.bucketManifest` references stale bucket folders
+- **Solution**: Parses `splunkd.log*` to extract affected bucket IDs, moves the entire bucket folders to a backup directory, and prunes the matching entries from the tier-level `.bucketManifest`
 
 ### Performance & Diagnostics
 
@@ -252,6 +253,12 @@ Send scripts to the repository maintainer for review. Include:
 - Rob Hilgefort (rhilgefort@splunk.com) - Repository setup, review, and stewardship
 
 ## Changelog
+
+### v1.7.2 - 2026-05-14
+
+**Updated:**
+
+- `bucket-manifests` - `remove_bucket_manifests.py` and `remove_bucket_manifests.sh` now move the entire bucket folder to the backup directory and prune the matching bucket line from the tier-level `.bucketManifest` (the manifest is rebuilt from the bucket folders, so removing only the manifest left the stale entry to come back)
 
 ### v1.7.1 - 2026-05-04
 

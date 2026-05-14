@@ -1,10 +1,10 @@
 # Bucket Manifest Cleaner
 
-A toolkit for identifying and moving stale `.bucketManifest` files from Splunk index buckets. Stale manifests can prevent buckets from being frozen/archived — `find_bucket_manifests.py` locates the affected buckets, `remove_bucket_manifests.py` (Python) or `remove_bucket_manifests.sh` (Bash) moves the manifest files to a backup directory, and `generate_test_event.py` seeds test data via HEC.
+A toolkit for identifying and removing stale Splunk index buckets whose presence in the tier-level `.bucketManifest` prevents them from being frozen/archived. `find_bucket_manifests.py` locates the affected buckets, `remove_bucket_manifests.py` (Python) or `remove_bucket_manifests.sh` (Bash) moves the entire bucket folder to a backup directory and prunes the matching line from the tier-level `.bucketManifest`, and `generate_test_event.py` seeds test data via HEC.
 
 ## Purpose
 
-When Splunk logs `freeze skipped for bid=<bucket_id>` in `splunkd.log`, it typically indicates a bucket has a stale or corrupt `.bucketManifest` file that is preventing normal freeze/archive lifecycle operations. This toolkit automates the discovery and cleanup process.
+When Splunk logs `freeze skipped for bid=<bucket_id>` in `splunkd.log`, it typically indicates the tier-level `.bucketManifest` (e.g. `$SPLUNK_DB/<index>/db/.bucketManifest`) references a bucket folder in a state that blocks freeze/archive lifecycle operations. Because the manifest is built off of the bucket folders, simply deleting the manifest is not enough — Splunk rebuilds the same stale entry from the folder. This toolkit moves the entire bucket folder out of the tier and prunes its line from the manifest.
 
 ## Requirements
 
@@ -35,21 +35,21 @@ _internaldb~42
 ### Step 3 — Dry-run the move
 
 ```bash
-$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifest_backup --dry-run
+$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/bucket_backup --dry-run
 ```
 
-### Step 4 — Move the manifest files
+### Step 4 — Move the bucket folders
 
 **Python (recommended — supports dry-run, SPLUNK_DB resolution, and detailed summary):**
 
 ```bash
-$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifest_backup
+$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/bucket_backup
 ```
 
 **Bash (simplified — requires `bash`, hardcoded to `/opt/splunk`):**
 
 ```bash
-./remove_bucket_manifests.sh --csv buckets.csv --backup /tmp/manifest_backup
+./remove_bucket_manifests.sh --csv buckets.csv --backup /tmp/bucket_backup
 ```
 
 ## find_bucket_manifests.py
@@ -98,21 +98,21 @@ Single column with header `bid`. Bucket IDs follow Splunk's native format:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--csv FILE` | *(required)* | CSV file produced by `find_bucket_manifests.py` |
-| `--backup-dir PATH` | *(required)* | Directory to move manifest files into (created if it does not exist) |
+| `--backup-dir PATH` | *(required)* | Directory to move bucket folders into (created if it does not exist) |
 | `--splunk-home PATH` | `$SPLUNK_HOME` or `/opt/splunk` | Splunk installation directory |
-| `--dry-run` | off | Print what would be moved without touching anything |
+| `--dry-run` | off | Print what would be moved and pruned without touching anything |
 
 ### Examples
 
 ```bash
 # Preview moves
-$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifest_backup --dry-run
+$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/bucket_backup --dry-run
 
 # Live run
-$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifest_backup
+$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/bucket_backup
 
 # Non-default Splunk install
-$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifest_backup --splunk-home /opt/splunk2
+$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/bucket_backup --splunk-home /opt/splunk2
 ```
 
 ### Example output
@@ -120,20 +120,21 @@ $SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-di
 ```
 [INFO]  SPLUNK_HOME : /opt/splunk
 [INFO]  SPLUNK_DB   : /opt/splunk/var/lib/splunk
-[INFO]  Backup dir  : /tmp/manifest_backup
+[INFO]  Backup dir  : /tmp/bucket_backup
 
 [INFO]  Loaded 3 bucket ID(s) from buckets.csv
 
-[OK]    Moved: .../myindex/db/db_1746000000_1745000000_35_B5C33FDC-.../.bucketManifest -> /tmp/manifest_backup/db_..._35_..._.bucketManifest
-[OK]    Moved: .../internaldb/db/db_1746000000_1745000000_42/.bucketManifest -> /tmp/manifest_backup/db_..._42_.bucketManifest
-[INFO]  No manifest present (already clean): ...
+[OK]    Moved folder: .../myindex/db/db_1746000000_1745000000_35_B5C33FDC-... -> /tmp/bucket_backup/db_..._35_...
+[OK]    Pruned entry 'db_..._35_...' from .../myindex/db/.bucketManifest
+[OK]    Moved folder: .../internaldb/db/db_1746000000_1745000000_42 -> /tmp/bucket_backup/db_..._42
+[OK]    Pruned entry 'db_..._42' from .../internaldb/db/.bucketManifest
 
 ==================================================
 Summary
 ==================================================
   Total buckets in CSV : 3
-  Moved                : 2
-  Already clean        : 1
+  Moved folders        : 3
+  Pruned manifest lines: 3
   Not found on disk    : 0
   Ambiguous matches    : 0
   Malformed / skipped  : 0
@@ -186,23 +187,23 @@ $SPLUNK_HOME/bin/python generate_test_event.py --token <HEC_TOKEN> --bid _intern
 #    Then use --scan to find manifests on disk
 $SPLUNK_HOME/bin/python find_bucket_manifests.py --scan --output buckets.csv
 
-# 3. Verify the CSV, then move the manifests
-$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifest_backup --dry-run
-$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/manifest_backup
+# 3. Verify the CSV, then move the bucket folders
+$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/bucket_backup --dry-run
+$SPLUNK_HOME/bin/python remove_bucket_manifests.py --csv buckets.csv --backup-dir /tmp/bucket_backup
 ```
 
 > **Note:** The event lands in `index=main`. To confirm receipt before running the find script, search `index=main "freeze skipped for bid"` in Splunk.
 
 ## remove_bucket_manifests.sh
 
-A simplified Bash alternative to the Python removal script. Copies `.bucketManifest` files to a backup folder then removes the originals. SPLUNK_HOME is hardcoded to `/opt/splunk` and there is no dry-run mode.
+A simplified Bash alternative to the Python removal script. Moves bucket folders to a backup directory and prunes the matching line from the tier-level `.bucketManifest`. SPLUNK_HOME is hardcoded to `/opt/splunk` and there is no dry-run mode.
 
 ### Options
 
 | Option | Description |
 |--------|-------------|
 | `--csv FILE` | *(required)* CSV file containing bucket IDs, one per line (no header row) |
-| `--backup PATH` | *(required)* Directory to copy manifest files into before removal |
+| `--backup PATH` | *(required)* Directory to move bucket folders into |
 
 ### CSV format
 
@@ -217,7 +218,7 @@ _internaldb~42
 ### Examples
 
 ```bash
-./remove_bucket_manifests.sh --csv buckets.csv --backup /tmp/manifest_backup
+./remove_bucket_manifests.sh --csv buckets.csv --backup /tmp/bucket_backup
 ```
 
 ### Differences from the Python script
@@ -228,16 +229,18 @@ _internaldb~42
 | Backup flag | `--backup-dir` | `--backup` |
 | Dry-run | Yes (`--dry-run`) | No |
 | CSV header | Required (`bid`) | Skipped automatically |
-| Operation | Atomic `shutil.move` | `cp` then `rm` |
+| Folder move | Atomic `shutil.move` | `mv` |
+| Manifest prune | Read + atomic temp + `os.replace` | `grep -v` + `mv` |
 | Summary | Detailed per-category count | Per-bucket echo only |
 
 ## Notes
 
 - **Two removal options.** Use the Python script for dry-run support, automatic SPLUNK_DB resolution, and a full summary. Use the Bash script for quick runs on standard `/opt/splunk` installs without needing Splunk's Python.
 
-- **Safe while Splunk is running.** Splunk regenerates `.bucketManifest` files automatically; moving them will not cause data loss. The script warns if `splunkd` is detected running, but does not block execution.
+- **Stop splunkd first.** Moving entire bucket folders while Splunk is running can cause search errors or data inconsistency. The Python script warns if `splunkd` is detected running, but does not block execution — stop it before proceeding.
+- **Manifest is rebuilt from folders.** The tier-level `.bucketManifest` is built off of the bucket folders in that tier. Removing only the manifest leaves the stale folder, which causes Splunk to regenerate the same bad entry. These scripts move the folder *and* prune the manifest line so the entry does not come back.
 - **`SPLUNK_DB` resolution.** The remove script checks the `SPLUNK_DB` env var, then `splunk-launch.conf`, then falls back to `$SPLUNK_HOME/var/lib/splunk` — consistent with how Splunk itself resolves the path.
 - **Bucket tiers searched.** `db/`, `colddb/`, and `thaweddb/` are all scanned. `frozendb` is excluded as frozen buckets are not managed by Splunk's lifecycle.
 - **Ambiguity guard.** If more than one directory matches a given bucket ID, that row is skipped and logged as a warning rather than guessing.
-- **Backup file naming.** Each moved file is prefixed with the bucket directory name (e.g. `db_<latest>_<earliest>_<seqno>_.bucketManifest`) to prevent collisions when buckets across different indices share the same sequence number.
-- **Exit code.** `remove_bucket_manifests.py` exits with code `1` if any move operations fail, suitable for use in automation pipelines.
+- **Backup destination naming.** Each moved bucket folder keeps its original directory name (e.g. `db_<latest>_<earliest>_<seqno>_<guid>`). If a backup destination already exists, the row is skipped to avoid clobbering an earlier backup.
+- **Exit code.** `remove_bucket_manifests.py` exits with code `1` if any move or prune operations fail, suitable for use in automation pipelines.

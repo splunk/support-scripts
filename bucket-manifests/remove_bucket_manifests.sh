@@ -78,20 +78,44 @@ while IFS= read -r bucket_id; do
         for bucket_dir in "${tier_path}"/${bucket_glob}; do
             [[ -d "$bucket_dir" ]] || continue
 
-            manifest="${bucket_dir}/.bucketManifest"
-            if [[ ! -f "$manifest" ]]; then
-                echo "[INFO]  No manifest present (already clean): ${manifest}"
+            bucket_basename="$(basename "$bucket_dir")"
+            tier_manifest="${tier_path}/.bucketManifest"
+
+            mkdir -p "$BACKUP_ROOT"
+            dest="${BACKUP_ROOT}/${bucket_basename}"
+
+            if [[ -e "$dest" ]]; then
+                echo "[WARN]  Backup destination already exists, skipping: ${dest}"
                 found=1
                 continue
             fi
 
-            # Unique backup filename: prefix with bucket dir basename
-            bucket_basename="$(basename "$bucket_dir")"
-            mkdir -p "$BACKUP_ROOT"
-            dest="${BACKUP_ROOT}/${bucket_basename}_.bucketManifest"
+            if mv "$bucket_dir" "$dest"; then
+                echo "[OK]    Moved folder: ${bucket_dir} -> ${dest}"
+            else
+                echo "[ERROR] Failed to move folder: ${bucket_dir}"
+                found=1
+                continue
+            fi
 
-            cp "$manifest" "$dest" && rm -f "$manifest"
-            echo "[OK]    Backed up and removed: ${manifest} -> ${dest}"
+            if [[ -f "$tier_manifest" ]]; then
+                tmp_manifest="${tier_manifest}.tmp.$$"
+                if grep -v -F "$bucket_basename" "$tier_manifest" > "$tmp_manifest"; then
+                    if ! cmp -s "$tier_manifest" "$tmp_manifest"; then
+                        mv "$tmp_manifest" "$tier_manifest"
+                        echo "[OK]    Pruned entry '${bucket_basename}' from ${tier_manifest}"
+                    else
+                        rm -f "$tmp_manifest"
+                        echo "[INFO]  No entry for '${bucket_basename}' in ${tier_manifest}"
+                    fi
+                else
+                    rm -f "$tmp_manifest"
+                    echo "[ERROR] Failed to rewrite ${tier_manifest}"
+                fi
+            else
+                echo "[INFO]  No tier-level manifest at: ${tier_manifest}"
+            fi
+
             found=1
         done
     done
